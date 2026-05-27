@@ -31,6 +31,25 @@ class IncidentOrchestrator:
                 "signal_value": signal.value,
             }
 
+        existing = self._existing_open_incident(signal)
+        if existing:
+            existing.signal_value = signal.value
+            self.timeline.append(
+                existing.id,
+                "duplicate_signal",
+                f"Additional {signal.type} signal received for {signal.service}: {signal.value}",
+                {"baseline": signal.baseline, "unit": signal.unit},
+            )
+            self.db.commit()
+            self.db.refresh(existing)
+            return {
+                **serialize_incident(existing, self.timeline.get(existing.id)),
+                "triggered": True,
+                "duplicate": True,
+                "actions_taken": [],
+                "recommended_actions": [],
+            }
+
         investigation, matched_incident_id = self.investigator.investigate(signal)
         incident = Incident(
             service=signal.service,
@@ -69,3 +88,15 @@ class IncidentOrchestrator:
             "actions_taken": actions_taken,
             "recommended_actions": investigation.recommended_actions,
         }
+
+    def _existing_open_incident(self, signal: SignalIn) -> Incident | None:
+        return (
+            self.db.query(Incident)
+            .filter(
+                Incident.status == "open",
+                Incident.service == signal.service,
+                Incident.signal_type == signal.type,
+            )
+            .order_by(Incident.detected_at.desc())
+            .first()
+        )

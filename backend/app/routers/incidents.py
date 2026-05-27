@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import ResolveIncidentIn, SignalIn, StatusQueryIn
+from app.schemas import ResolveIncidentIn, RollbackIn, SignalIn, StatusQueryIn
 from app.services.incident_service import IncidentService
+from app.services.rollback_service import RollbackService
 
 
 router = APIRouter(tags=["incidents"])
@@ -42,6 +43,22 @@ def resolve_incident(
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
     return service.resolve(incident, payload)
+
+
+@router.post("/api/incidents/{incident_id}/rollback")
+def rollback_incident(
+    incident_id: int,
+    payload: RollbackIn | None = None,
+    db: Session = Depends(get_db),
+) -> dict:
+    service = IncidentService(db)
+    incident = service.get(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    if incident.status != "open":
+        raise HTTPException(status_code=400, detail="Only open incidents can be rolled back")
+    rollback_payload = payload or RollbackIn()
+    return RollbackService(db).execute(incident, delay_seconds=rollback_payload.delay_seconds)
 
 
 @router.post("/api/status")

@@ -47,4 +47,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ resolution_text: resolutionText }),
     }),
+  rollbackIncident: (incidentId, delaySeconds = 0) =>
+    request(`/api/incidents/${incidentId}/rollback`, {
+      method: 'POST',
+      body: JSON.stringify({ delay_seconds: delaySeconds }),
+    }),
 };

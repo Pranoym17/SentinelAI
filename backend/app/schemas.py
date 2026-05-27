@@ -61,6 +61,10 @@ class ResolveIncidentIn(BaseModel):
     resolution_text: str = Field(min_length=1)
 
 
+class RollbackIn(BaseModel):
+    delay_seconds: float = Field(default=0.0, ge=0.0, le=2.0)
+
+
 class StatusQueryIn(BaseModel):
     query: str = "What is the status?"
     incident_id: int | None = None

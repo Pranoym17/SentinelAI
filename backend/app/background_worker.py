@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from app.agents.incident_orchestrator import IncidentOrchestrator
 from app.database import SessionLocal
-from app.models import Config, Incident, MetricSnapshot
+from app.models import Config, MetricSnapshot
 from app.schemas import SignalIn
 from app.time_utils import utc_now
 
@@ -72,7 +72,7 @@ class BackgroundWorker:
                 z_score = compute_z_score(value, list(window))
                 window.append(value)
 
-                if z_score > self.z_threshold and not self._has_open_incident(db, service, "error_spike"):
+                if z_score > self.z_threshold:
                     signal = SignalIn(
                         service=service,
                         type="error_spike",
@@ -91,19 +91,6 @@ class BackgroundWorker:
                 self._payment_spike_at = None
                 return 18.0
         return 0.2
-
-    def _has_open_incident(self, db, service: str, signal_type: str) -> bool:
-        return (
-            db.query(Incident)
-            .filter(
-                Incident.status == "open",
-                Incident.service == service,
-                Incident.signal_type == signal_type,
-            )
-            .first()
-            is not None
-        )
-
 
 def compute_z_score(value: float, previous_values: list[float]) -> float:
     if len(previous_values) < 2:
