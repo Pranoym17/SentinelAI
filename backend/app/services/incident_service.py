@@ -1,0 +1,155 @@
+from datetime import datetime
+
+from sqlalchemy.orm import Session
+
+from app.models import Config, Incident
+from app.schemas import ResolveIncidentIn, SignalIn, StatusQueryIn
+from app.services.memory_service import MemoryService
+from app.services.metrics_service import MetricsService
+from app.services.response_agent import ResponseAgent
+from app.services.serializers import serialize_incident
+from app.services.timeline_service import TimelineService
+
+
+def severity_for_signal(payload: SignalIn) -> str:
+    if payload.type == "error_spike" and payload.value >= 10:
+        return "SEV-1"
+    if payload.type == "latency_spike" and payload.value >= 2000:
+        return "SEV-2"
+    return "SEV-3"
+
+
+class IncidentService:
+    def __init__(self, db: Session):
+        self.db = db
+        self.metrics = MetricsService(db)
+        self.timeline = TimelineService(db)
+        self.memory = MemoryService(db)
+
+    def latest_config(self) -> Config | None:
+        return self.db.query(Config).order_by(Config.id.desc()).first()
+
+    def create_from_signal(self, payload: SignalIn) -> dict:
+        config = self.latest_config()
+        self.metrics.record_signal(payload.service, payload.type, payload.value, payload.baseline)
+        past_matches = self.memory.find_matches(payload.service, payload.type, limit=1)
+        confidence = 80 if payload.value > payload.baseline else 35
+        if past_matches:
+            confidence = min(95, confidence + 10)
+
+        severity = severity_for_signal(payload)
+        reasoning_chain = [
+            {
+                "step": "SIGNAL DETECTED",
+                "detail": f"{payload.service} {payload.type} at {payload.value} vs baseline {payload.baseline}",
+                "confidence": 30,
+            },
+            {
+                "step": "CHECKING MEMORY",
+                "detail": (
+                    f"Found matching historical incident #{past_matches[0].id}"
+                    if past_matches
+                    else "No matching historical incident found yet."
+                ),
+                "confidence": confidence,
+            },
+        ]
+        incident = Incident(
+            service=payload.service,
+            signal_type=payload.type,
+            signal_value=payload.value,
+            severity=severity,
+            hypothesis=f"{payload.service} is showing an anomalous {payload.type}. Investigation pending.",
+            confidence=confidence,
+            reasoning_chain=reasoning_chain,
+            affected_teams=[payload.service, "platform"],
+            matched_past_incident_id=past_matches[0].id if past_matches else None,
+        )
+        self.db.add(incident)
+        self.db.flush()
+
+        event = self.timeline.append(
+            incident.id,
+            "detection",
+            f"{payload.type} detected for {payload.service}: {payload.value}",
+            {"baseline": payload.baseline, "unit": payload.unit},
+        )
+        self.db.commit()
+        self.db.refresh(incident)
+        actions_taken = ResponseAgent(self.db, config).route(incident) if config else []
+        timeline = self.timeline.get(incident.id)
+
+        return {
+            **serialize_incident(incident, timeline),
+            "triggered": True,
+            "actions_taken": actions_taken,
+        }
+
+    def list(self) -> dict:
+        incidents = self.db.query(Incident).order_by(Incident.detected_at.desc()).all()
+        active = [serialize_incident(incident) for incident in incidents if incident.status == "open"]
+        resolved = [serialize_incident(incident) for incident in incidents if incident.status == "resolved"]
+        return {"active": active, "resolved": resolved}
+
+    def get(self, incident_id: int) -> Incident | None:
+        return self.db.get(Incident, incident_id)
+
+    def detail(self, incident: Incident) -> dict:
+        return serialize_incident(incident, self.timeline.get(incident.id))
+
+    def resolve(self, incident: Incident, payload: ResolveIncidentIn) -> dict:
+        incident.status = "resolved"
+        incident.resolved_at = datetime.utcnow()
+        incident.resolution_text = payload.resolution_text
+        incident.duration_minutes = max(
+            0,
+            int((incident.resolved_at - incident.detected_at).total_seconds() / 60),
+        )
+        incident.post_mortem = (
+            f"# INCIDENT POST-MORTEM - {incident.service.upper()}\n\n"
+            f"## Summary\n{incident.hypothesis}\n\n"
+            f"## Resolution\n{payload.resolution_text}\n\n"
+            "## Note\nAI-generated post-mortem will be implemented in a later phase.\n"
+        )
+        self.memory.remember(
+            service=incident.service,
+            signal_type=incident.signal_type,
+            root_cause=incident.hypothesis or "Unknown root cause",
+            resolution=payload.resolution_text,
+            duration_minutes=incident.duration_minutes or 0,
+            occurred_at=incident.detected_at,
+        )
+        self.timeline.append(
+            incident.id,
+            "resolved",
+            f"Incident resolved: {payload.resolution_text}",
+        )
+        self.db.commit()
+        self.db.refresh(incident)
+
+        return {
+            "status": "resolved",
+            "duration_minutes": incident.duration_minutes,
+            "post_mortem": incident.post_mortem,
+        }
+
+    def status_response(self, payload: StatusQueryIn) -> dict:
+        incident = self.db.get(Incident, payload.incident_id) if payload.incident_id else None
+        if incident is None:
+            incident = (
+                self.db.query(Incident)
+                .filter(Incident.status == "open")
+                .order_by(Incident.detected_at.desc())
+                .first()
+            )
+        if incident is None:
+            return {"response": "No active incidents. All monitored systems are currently normal."}
+
+        duration = int((datetime.utcnow() - incident.detected_at).total_seconds() / 60)
+        response = (
+            f"{incident.service} incident is {incident.status} at {incident.severity}. "
+            f"It has been open for {duration} minutes. "
+            f"Current hypothesis: {incident.hypothesis} "
+            f"Confidence is {incident.confidence}%."
+        )
+        return {"response": response}

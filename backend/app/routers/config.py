@@ -4,21 +4,10 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Config
 from app.schemas import ConfigIn, ConfigOut
+from app.services.serializers import serialize_config
 
 
 router = APIRouter(prefix="/api/config", tags=["config"])
-
-
-def serialize_config(config: Config) -> dict:
-    return {
-        "id": config.id,
-        "services": config.services or [],
-        "signals": config.signals or [],
-        "actions": config.actions or [],
-        "thresholds": config.thresholds or {},
-        "slack_channel": config.slack_channel or "#incidents",
-        "jira_project_key": config.jira_project_key or "INC",
-    }
 
 
 @router.get("", response_model=ConfigOut)
