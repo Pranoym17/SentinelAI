@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
 from app import models  # noqa: F401
+from app.routers import config, incidents, metrics, seed
 
 
 Base.metadata.create_all(bind=engine)
@@ -21,3 +22,9 @@ app.add_middleware(
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+app.include_router(config.router)
+app.include_router(metrics.router)
+app.include_router(seed.router)
+app.include_router(incidents.router)
