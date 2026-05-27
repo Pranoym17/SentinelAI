@@ -3,7 +3,7 @@ import json
 
 from openai import OpenAI
 
-from app.agents.types import INVESTIGATION_JSON_SCHEMA, InvestigationResult
+from app.agents.types import INVESTIGATION_JSON_SCHEMA, STATUS_JSON_SCHEMA, InvestigationResult, StatusResult
 
 
 class OpenAIService:
@@ -63,3 +63,47 @@ class OpenAIService:
         )
         content = response.choices[0].message.content or "{}"
         return InvestigationResult.model_validate_json(content)
+
+    def generate_status(self, context: dict) -> str:
+        if not self.client:
+            raise RuntimeError("OpenAI client is not configured")
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You answer incident-status questions for engineering managers. "
+                        "Use only the provided incident and timeline. Respond in 2-4 plain English sentences."
+                    ),
+                },
+                {"role": "user", "content": json.dumps(context, indent=2, default=str)},
+            ],
+            response_format={"type": "json_schema", "json_schema": STATUS_JSON_SCHEMA},
+            temperature=0.2,
+        )
+        content = response.choices[0].message.content or "{}"
+        return StatusResult.model_validate_json(content).response
+
+    def generate_post_mortem(self, context: dict) -> str:
+        if not self.client:
+            raise RuntimeError("OpenAI client is not configured")
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You write concise professional incident post-mortems in markdown. "
+                        "Use only the provided incident data, reasoning chain, and timeline. "
+                        "Include Summary, What happened, Root cause, How it was detected, "
+                        "Resolution, Timeline, Action items, and Lessons learned."
+                    ),
+                },
+                {"role": "user", "content": json.dumps(context, indent=2, default=str)},
+            ],
+            temperature=0.2,
+        )
+        return response.choices[0].message.content or ""

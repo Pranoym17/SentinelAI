@@ -16,6 +16,24 @@ class InvestigationResult(BaseModel):
     recommended_actions: list[str]
 
 
+class StatusResult(BaseModel):
+    response: str
+
+
+STATUS_JSON_SCHEMA = {
+    "name": "incident_status",
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "response": {"type": "string"},
+        },
+        "required": ["response"],
+    },
+    "strict": True,
+}
+
+
 INVESTIGATION_JSON_SCHEMA = {
     "name": "incident_investigation",
     "schema": {

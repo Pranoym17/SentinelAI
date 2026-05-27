@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from app.models import Config, Incident
 from app.schemas import ResolveIncidentIn, SignalIn, StatusQueryIn
 from app.agents.incident_orchestrator import IncidentOrchestrator
+from app.agents.post_mortem_agent import PostMortemAgent
+from app.agents.status_agent import StatusAgent
 from app.services.memory_service import MemoryService
 from app.services.serializers import serialize_incident
 from app.services.timeline_service import TimelineService
@@ -51,12 +53,13 @@ class IncidentService:
             0,
             int((incident.resolved_at - incident.detected_at).total_seconds() / 60),
         )
-        incident.post_mortem = (
-            f"# INCIDENT POST-MORTEM - {incident.service.upper()}\n\n"
-            f"## Summary\n{incident.hypothesis}\n\n"
-            f"## Resolution\n{payload.resolution_text}\n\n"
-            "## Note\nAI-generated post-mortem will be implemented in a later phase.\n"
+        self.timeline.append(
+            incident.id,
+            "resolved",
+            f"Incident resolved: {payload.resolution_text}",
         )
+        timeline = self.timeline.get(incident.id)
+        incident.post_mortem = PostMortemAgent().generate(incident, timeline)
         self.memory.remember(
             service=incident.service,
             signal_type=incident.signal_type,
@@ -64,11 +67,6 @@ class IncidentService:
             resolution=payload.resolution_text,
             duration_minutes=incident.duration_minutes or 0,
             occurred_at=incident.detected_at,
-        )
-        self.timeline.append(
-            incident.id,
-            "resolved",
-            f"Incident resolved: {payload.resolution_text}",
         )
         self.db.commit()
         self.db.refresh(incident)
@@ -91,11 +89,5 @@ class IncidentService:
         if incident is None:
             return {"response": "No active incidents. All monitored systems are currently normal."}
 
-        duration = int((datetime.utcnow() - incident.detected_at).total_seconds() / 60)
-        response = (
-            f"{incident.service} incident is {incident.status} at {incident.severity}. "
-            f"It has been open for {duration} minutes. "
-            f"Current hypothesis: {incident.hypothesis} "
-            f"Confidence is {incident.confidence}%."
-        )
-        return {"response": response}
+        timeline = self.timeline.get(incident.id)
+        return {"response": StatusAgent().answer(payload.query, incident, timeline)}
