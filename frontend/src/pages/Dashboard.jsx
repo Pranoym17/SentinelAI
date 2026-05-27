@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [postMortem, setPostMortem] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [now, setNow] = useState(Date.now());
 
   const incident = selectedIncident || state?.active_incident;
 
@@ -47,6 +48,11 @@ export default function Dashboard() {
     return () => window.clearInterval(interval);
   }, [selectedIncident]);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   async function run(action) {
     setBusy(true);
     setError('');
@@ -67,6 +73,13 @@ export default function Dashboard() {
     setPostMortem(detail.post_mortem || '');
   }
 
+  const countdown = state?.worker?.payment_spike_at
+    ? Math.max(0, Math.ceil((new Date(state.worker.payment_spike_at).getTime() - now) / 1000))
+    : null;
+  const activeTimeline = incident?.timeline || state?.timeline || [];
+  const slaWarning = activeTimeline.find((event) => event.event_type === 'sla_warning');
+  const correlation = activeTimeline.find((event) => event.event_type === 'correlation_detected');
+
   return (
     <main className="dashboard-shell">
       <header className="topbar">
@@ -84,6 +97,8 @@ export default function Dashboard() {
 
       <DemoControlBar
         busy={busy}
+        countdown={countdown}
+        workerState={state?.worker}
         onFullSeed={() => run(() => api.fullSeed())}
         onReset={() => run(() => api.resetDemo(true))}
         onTrigger={() => run(() => api.triggerDemo(30))}
@@ -102,6 +117,24 @@ export default function Dashboard() {
 
       <div className="dashboard-grid">
         <section className="main-stack">
+          <section className="stats-grid">
+            <div className="panel stat-card">
+              <p className="eyebrow">System score</p>
+              <h2>{incident ? '68' : '94'}</h2>
+            </div>
+            <div className="panel stat-card">
+              <p className="eyebrow">Active</p>
+              <h2>{incidents.active?.length || 0}</h2>
+            </div>
+            <div className="panel stat-card">
+              <p className="eyebrow">SLA</p>
+              <h2>{slaWarning ? 'At risk' : 'Healthy'}</h2>
+            </div>
+            <div className="panel stat-card">
+              <p className="eyebrow">Correlation</p>
+              <h2>{correlation ? 'Detected' : 'Clear'}</h2>
+            </div>
+          </section>
           <MetricChart history={history} deploys={state?.recent_deploys || []} />
           <MetricsPanel metrics={state?.metrics || []} />
           <IncidentCommandPanel
@@ -120,7 +153,7 @@ export default function Dashboard() {
             busy={busy}
             onRollback={() => incident && run(() => api.rollbackIncident(incident.incident_id, 0))}
           />
-          <TimelineFeed timeline={incident?.timeline || state?.timeline || []} />
+          <TimelineFeed timeline={activeTimeline} />
           <IncidentHistory incidents={incidents} onSelect={selectHistory} />
         </aside>
       </div>

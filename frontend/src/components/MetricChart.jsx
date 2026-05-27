@@ -39,19 +39,19 @@ export default function MetricChart({ history, deploys }) {
       <div className="chart-wrap">
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={data}>
-            <CartesianGrid stroke="#223044" strokeDasharray="3 3" />
-            <XAxis dataKey="time" stroke="#9aa7b7" minTickGap={28} />
-            <YAxis stroke="#9aa7b7" domain={[0, 'dataMax + 2']} />
+            <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+            <XAxis dataKey="time" stroke="var(--text-secondary)" minTickGap={28} />
+            <YAxis stroke="var(--text-secondary)" domain={[0, 'dataMax + 2']} />
             <Tooltip
-              contentStyle={{ background: '#0b1220', border: '1px solid #263244', borderRadius: 8 }}
-              labelStyle={{ color: '#e5edf8' }}
+              contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8 }}
+              labelStyle={{ color: 'var(--text-primary)' }}
             />
-            <ReferenceLine y={0.2} stroke="#22c55e" strokeDasharray="4 4" label="baseline" />
-            <ReferenceLine y={5} stroke="#f59e0b" strokeDasharray="4 4" label="threshold" />
+            <ReferenceLine y={0.2} stroke="var(--healthy)" strokeDasharray="4 4" label="baseline" />
+            <ReferenceLine y={5} stroke="var(--warning)" strokeDasharray="4 4" label="threshold" />
             <Line
               type="monotone"
               dataKey="error_rate"
-              stroke="#ef4444"
+              stroke="var(--critical)"
               strokeWidth={3}
               dot={false}
               isAnimationActive={false}

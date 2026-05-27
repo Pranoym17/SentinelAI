@@ -1,4 +1,5 @@
 import { Terminal } from 'lucide-react';
+import { TerminalPanel } from './ui.jsx';
 
 export default function RollbackTerminal({ incident, busy, onRollback }) {
   const logs = (incident?.timeline || []).filter((event) => event.event_type === 'rollback_log');
@@ -16,12 +17,7 @@ export default function RollbackTerminal({ incident, busy, onRollback }) {
       <button type="button" disabled={!incident || busy || completed} onClick={onRollback}>
         {completed ? 'Rollback complete' : 'Run rollback'}
       </button>
-      <div className="terminal">
-        {logs.length === 0 && <span>$ waiting for rollback...</span>}
-        {logs.map((event) => (
-          <span key={event.id}>$ {event.description}</span>
-        ))}
-      </div>
+      <TerminalPanel title="rollback.log" lines={logs.map((event) => event.description)} empty="waiting for rollback..." />
     </section>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CheckCircle2, ExternalLink, MessageSquare, Network, ShieldAlert } from 'lucide-react';
 
 import { api } from '../api.js';
+import { TerminalPanel } from './ui.jsx';
 
 export default function IncidentCommandPanel({ incident, onRefresh, onResolved }) {
   const [query, setQuery] = useState("What's the status?");
@@ -127,17 +128,7 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
         </div>
       )}
 
-      <div className="reasoning-box">
-        {(incident.reasoning_chain || []).map((step, index) => (
-          <div className="reasoning-step" key={`${step.step}-${index}`}>
-            <div>
-              <strong>{step.step}</strong>
-              <span>{step.confidence}%</span>
-            </div>
-            <p>{step.detail}</p>
-          </div>
-        ))}
-      </div>
+      <TerminalPanel title="Reasoning chain" lines={incident.reasoning_chain || []} />
 
       <div className="query-row">
         <MessageSquare size={18} />
@@ -155,12 +146,24 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
         </button>
       </div>
       {blastRadius && (
-        <div className="insight-box">
-          <strong>Blast radius: {blastRadius.risk_level}</strong>
-          <p>{blastRadius.warning || 'No connected services found.'}</p>
-          {(blastRadius.affected_services || []).length > 0 && (
-            <small>Affected: {blastRadius.affected_services.join(', ')}</small>
-          )}
+        <div className="modal-backdrop" role="dialog" aria-label="Blast radius analysis">
+          <div className="modal-panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Blast radius</p>
+                <h2>{blastRadius.risk_level} risk</h2>
+              </div>
+              <button type="button" className="ghost-button icon-button" onClick={() => setBlastRadius(null)}>
+                ×
+              </button>
+            </div>
+            <p className="muted">{blastRadius.warning || 'No connected services found.'}</p>
+            {(blastRadius.affected_services || []).length > 0 && (
+              <div className="pill-row">
+                {blastRadius.affected_services.map((service) => <span key={service}>{service}</span>)}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
