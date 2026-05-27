@@ -155,6 +155,26 @@ def test_rollback_simulation_logs_and_normalizes_metric(client):
     assert payments["error_rate"]["value"] == 0.2
 
 
+def test_rollback_rejects_resolved_incident(client):
+    assert save_config(client).status_code == 200
+    seed_context(client)
+    incident = client.post(
+        "/api/signal",
+        json={"service": "payments", "type": "error_spike", "value": 18.0, "baseline": 0.2},
+    ).json()
+    client.post(
+        f"/api/incidents/{incident['incident_id']}/resolve",
+        json={"resolution_text": "Rolled back payments-api"},
+    )
+
+    response = client.post(
+        f"/api/incidents/{incident['incident_id']}/rollback",
+        json={"delay_seconds": 0},
+    )
+
+    assert response.status_code == 400
+
+
 def test_demo_reset_and_full_seed(client):
     seeded = client.post("/api/demo/full-seed").json()
     assert seeded["status"] == "seeded"
@@ -163,3 +183,10 @@ def test_demo_reset_and_full_seed(client):
     reset = client.post("/api/demo/reset?keep_config=false").json()
     assert reset["status"] == "reset"
     assert client.get("/api/config").status_code == 404
+
+
+def test_demo_trigger_reports_worker_state(client):
+    response = client.post("/api/demo/trigger?delay_seconds=1").json()
+    assert response["status"] == "scheduled"
+    state = client.get("/api/demo/worker").json()
+    assert state["payment_spike_at"] is not None
