@@ -7,6 +7,7 @@ from app.agents.post_mortem_agent import PostMortemAgent
 from app.agents.status_agent import StatusAgent
 from app.services.memory_service import MemoryService
 from app.services.serializers import serialize_incident
+from app.services.runbook_service import RunbookService
 from app.services.sla_service import SLAService
 from app.services.timeline_service import TimelineService
 from app.time_utils import utc_now
@@ -25,6 +26,7 @@ class IncidentService:
         self.db = db
         self.timeline = TimelineService(db)
         self.memory = MemoryService(db)
+        self.runbooks = RunbookService(db)
 
     def latest_config(self) -> Config | None:
         return self.db.query(Config).order_by(Config.id.desc()).first()
@@ -85,6 +87,14 @@ class IncidentService:
                 "sla_breached": sla_record.sla_breached,
             },
         )
+        successful_runbooks = self.runbooks.mark_successful(incident.service, incident.signal_type)
+        if successful_runbooks:
+            self.timeline.append(
+                incident.id,
+                "runbook_success_recorded",
+                f"Marked {len(successful_runbooks)} matching runbook(s) successful",
+                {"runbook_ids": [runbook.id for runbook in successful_runbooks]},
+            )
         self.db.commit()
         self.db.refresh(incident)
 

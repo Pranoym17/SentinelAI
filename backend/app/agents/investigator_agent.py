@@ -6,6 +6,7 @@ from app.agents.types import InvestigationResult
 from app.models import HealthCheck, HistoricalIncident, RecentDeploy
 from app.schemas import SignalIn
 from app.services.openai_service import OpenAIService
+from app.services.runbook_service import RunbookService
 from app.time_utils import utc_now
 
 
@@ -51,6 +52,7 @@ class InvestigatorAgent:
             .limit(10)
             .all()
         )
+        matching_runbooks = RunbookService(self.db).matching(signal.service, signal.type, mark_used=True)
         matched_incident_id = past_incidents[0].id if past_incidents else None
 
         context = {
@@ -80,6 +82,16 @@ class InvestigatorAgent:
                     "latency_ms": check.latency_ms,
                 }
                 for check in health_checks
+            ],
+            "runbooks": [
+                {
+                    "id": runbook.id,
+                    "title": runbook.title,
+                    "steps": runbook.steps or [],
+                    "times_used": runbook.times_used,
+                    "times_successful": runbook.times_successful,
+                }
+                for runbook in matching_runbooks
             ],
         }
         return context, matched_incident_id
@@ -135,6 +147,16 @@ class InvestigatorAgent:
                 }
             )
 
+        if context.get("runbooks"):
+            runbook = context["runbooks"][0]
+            reasoning_chain.append(
+                {
+                    "step": "CHECKING RUNBOOKS",
+                    "detail": f"Found runbook '{runbook['title']}' with steps: {', '.join(runbook['steps'][:3])}",
+                    "confidence": confidence,
+                }
+            )
+
         healthy_dependencies = all(check["status"] == "healthy" for check in context["health_checks"])
         if healthy_dependencies and context["health_checks"]:
             confidence += 15
@@ -166,6 +188,7 @@ class InvestigatorAgent:
             severity=severity,
             affected_teams=[signal.service, "platform"],
             recommended_actions=[
+                *([f"Follow runbook: {context['runbooks'][0]['title']}"] if context.get("runbooks") else []),
                 f"Review recent {signal.service} deploys",
                 "Check exception logs",
                 "Prepare rollback if errors remain elevated",

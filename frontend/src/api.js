@@ -94,4 +94,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ delay_seconds: delaySeconds }),
     }),
+  analyzeBlastRadius: (incidentId) =>
+    request(`/api/incidents/${incidentId}/blast-radius`, {
+      method: 'POST',
+    }),
 };

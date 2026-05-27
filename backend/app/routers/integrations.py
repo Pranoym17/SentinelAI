@@ -10,8 +10,8 @@ router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 
 
 @router.get("/status")
-def status() -> dict:
-    return IntegrationService().status()
+def status(db: Session = Depends(get_db)) -> dict:
+    return IntegrationService(db).status()
 
 
 @router.get("")
@@ -25,10 +25,10 @@ def save_integration(payload: IntegrationConfigIn, db: Session = Depends(get_db)
 
 
 @router.post("/slack/test")
-def test_slack() -> dict:
-    return IntegrationService().test_slack()
+def test_slack(db: Session = Depends(get_db)) -> dict:
+    return IntegrationService(db).test_slack()
 
 
 @router.post("/jira/test")
-def test_jira() -> dict:
-    return IntegrationService().test_jira()
+def test_jira(db: Session = Depends(get_db)) -> dict:
+    return IntegrationService(db).test_jira()

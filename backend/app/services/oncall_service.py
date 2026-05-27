@@ -10,18 +10,21 @@ class OnCallService:
         self.db = db
 
     def current(self) -> dict:
-        now = utc_now()
-        oncall = (
-            self.db.query(OnCallSchedule)
-            .filter(
-                OnCallSchedule.is_active.is_(True),
-                OnCallSchedule.start_time <= now,
-                OnCallSchedule.end_time >= now,
-            )
-            .order_by(OnCallSchedule.start_time.desc())
-            .first()
-        )
+        oncall = self.current_schedule()
         return {"oncall": self.serialize(oncall) if oncall else None}
+
+    def current_schedule(self, team: str | None = None) -> OnCallSchedule | None:
+        now = utc_now()
+        query = self.db.query(OnCallSchedule).filter(
+            OnCallSchedule.is_active.is_(True),
+            OnCallSchedule.start_time <= now,
+            OnCallSchedule.end_time >= now,
+        )
+        if team:
+            team_match = query.filter(OnCallSchedule.team == team).order_by(OnCallSchedule.start_time.desc()).first()
+            if team_match:
+                return team_match
+        return query.order_by(OnCallSchedule.start_time.desc()).first()
 
     def create(self, payload: OnCallScheduleIn) -> dict:
         schedule = OnCallSchedule(**payload.model_dump())

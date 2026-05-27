@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Session
 
 from app.models import Config, Incident
+from app.services.integration_config_resolver import IntegrationConfigResolver
 from app.services.jira_service import JiraService
+from app.services.oncall_service import OnCallService
 from app.services.slack_service import SlackService
 from app.services.timeline_service import TimelineService
 
@@ -10,9 +12,11 @@ class ResponseAgent:
     def __init__(self, db: Session, config: Config):
         self.db = db
         self.config = config
-        self.jira = JiraService()
-        self.slack = SlackService()
+        integration_configs = IntegrationConfigResolver(db)
+        self.jira = JiraService(integration_configs.config_for("jira"))
+        self.slack = SlackService(integration_configs.config_for("slack"))
         self.timeline = TimelineService(db)
+        self.oncall = OnCallService(db)
 
     def route(self, incident: Incident, recommended_actions: list[str] | None = None) -> list[str]:
         actions_taken = []
@@ -53,7 +57,8 @@ class ResponseAgent:
 
         elif incident.confidence >= 50:
             if "slack" in configured_actions:
-                result = self.slack.post_review_request(incident, recommended_actions)
+                current_oncall = self._identify_oncall(incident)
+                result = self.slack.post_review_request(incident, recommended_actions, current_oncall)
                 if result.get("posted"):
                     self.timeline.append(incident.id, "slack_review_requested", "Slack review request sent")
                     actions_taken.append("slack_review_requested")
@@ -62,8 +67,9 @@ class ResponseAgent:
                 else:
                     self.timeline.append(incident.id, "slack_skipped", result.get("reason", "Slack skipped"))
         else:
+            current_oncall = self._identify_oncall(incident)
             if "slack" in configured_actions:
-                result = self.slack.post_low_confidence_alert(incident)
+                result = self.slack.post_low_confidence_alert(incident, current_oncall)
                 if result.get("posted"):
                     self.timeline.append(incident.id, "slack_low_confidence_sent", "Slack low-confidence alert sent")
                     actions_taken.append("slack_low_confidence_sent")
@@ -76,3 +82,17 @@ class ResponseAgent:
 
         self.db.commit()
         return actions_taken
+
+    def _identify_oncall(self, incident: Incident) -> dict | None:
+        team = (incident.affected_teams or [None])[0]
+        schedule = self.oncall.current_schedule(team=team)
+        if not schedule:
+            return None
+        data = self.oncall.serialize(schedule)
+        self.timeline.append(
+            incident.id,
+            "oncall_identified",
+            f"On-call identified: {data['name']} ({data.get('team') or 'unknown team'})",
+            data,
+        )
+        return data

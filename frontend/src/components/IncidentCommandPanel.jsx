@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, ExternalLink, MessageSquare, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, ExternalLink, MessageSquare, Network, ShieldAlert } from 'lucide-react';
 
 import { api } from '../api.js';
 
@@ -7,6 +7,7 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
   const [query, setQuery] = useState("What's the status?");
   const [status, setStatus] = useState('');
   const [resolution, setResolution] = useState('Rolled back payments-api to v2.4.0');
+  const [blastRadius, setBlastRadius] = useState(null);
   const [busy, setBusy] = useState(false);
 
   if (!incident) {
@@ -40,6 +41,22 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
     }
   }
 
+  async function analyzeBlastRadius() {
+    setBusy(true);
+    try {
+      const data = await api.analyzeBlastRadius(incident.incident_id);
+      setBlastRadius(data);
+      await onRefresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const timeline = incident.timeline || [];
+  const oncallEvent = timeline.find((event) => event.event_type === 'oncall_identified');
+  const slaEvent = timeline.find((event) => event.event_type === 'sla_warning');
+  const correlationEvent = timeline.find((event) => event.event_type === 'correlation_detected');
+
   return (
     <section className="panel incident-panel command-panel">
       <div className="section-heading">
@@ -71,7 +88,44 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
         ) : (
           <span>Slack pending</span>
         )}
+        {oncallEvent && <span>On-call found</span>}
+        {slaEvent && <span>SLA risk</span>}
+        {correlationEvent && <span>Correlated</span>}
       </div>
+
+      {(incident.recommended_actions || []).length > 0 && (
+        <div className="insight-box">
+          <strong>Recommended actions</strong>
+          <ul>
+            {incident.recommended_actions.map((action) => (
+              <li key={action}>{action}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(oncallEvent || slaEvent || correlationEvent) && (
+        <div className="insight-grid">
+          {oncallEvent && (
+            <div>
+              <strong>On-call</strong>
+              <span>{oncallEvent.description}</span>
+            </div>
+          )}
+          {slaEvent && (
+            <div>
+              <strong>SLA</strong>
+              <span>{slaEvent.description}</span>
+            </div>
+          )}
+          {correlationEvent && (
+            <div>
+              <strong>Correlation</strong>
+              <span>{correlationEvent.description}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="reasoning-box">
         {(incident.reasoning_chain || []).map((step, index) => (
@@ -93,6 +147,22 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
         </button>
       </div>
       {status && <p className="status-response">{status}</p>}
+
+      <div className="query-row">
+        <Network size={18} />
+        <button type="button" disabled={busy} onClick={analyzeBlastRadius}>
+          Analyze blast radius
+        </button>
+      </div>
+      {blastRadius && (
+        <div className="insight-box">
+          <strong>Blast radius: {blastRadius.risk_level}</strong>
+          <p>{blastRadius.warning || 'No connected services found.'}</p>
+          {(blastRadius.affected_services || []).length > 0 && (
+            <small>Affected: {blastRadius.affected_services.join(', ')}</small>
+          )}
+        </div>
+      )}
 
       <div className="query-row">
         <CheckCircle2 size={18} />

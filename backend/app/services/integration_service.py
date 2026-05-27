@@ -13,8 +13,12 @@ class IntegrationService:
         self.db = db
 
     def status(self) -> dict:
-        jira = JiraService()
-        slack = SlackService()
+        configs = {}
+        if self.db:
+            for integration in self.db.query(IntegrationConfig).filter(IntegrationConfig.enabled.is_(True)).all():
+                configs[integration.integration_type] = integration.config or {}
+        jira = JiraService(configs.get("jira"))
+        slack = SlackService(configs.get("slack"))
         openai = OpenAIService()
         return {
             "openai": {
@@ -77,7 +81,15 @@ class IntegrationService:
             confidence=55,
             affected_teams=["platform"],
         )
-        return SlackService().post_review_request(
+        config = {}
+        if self.db:
+            integration = (
+                self.db.query(IntegrationConfig)
+                .filter(IntegrationConfig.integration_type == "slack", IntegrationConfig.enabled.is_(True))
+                .first()
+            )
+            config = integration.config if integration else {}
+        return SlackService(config).post_review_request(
             incident,
             ["Verify webhook delivery", "Confirm channel visibility"],
         )
@@ -93,4 +105,12 @@ class IntegrationService:
             reasoning_chain=[{"step": "SMOKE TEST", "detail": "Testing Jira credential and project configuration"}],
             affected_teams=["platform"],
         )
-        return JiraService().create_ticket(incident)
+        config = {}
+        if self.db:
+            integration = (
+                self.db.query(IntegrationConfig)
+                .filter(IntegrationConfig.integration_type == "jira", IntegrationConfig.enabled.is_(True))
+                .first()
+            )
+            config = integration.config if integration else {}
+        return JiraService(config).create_ticket(incident)

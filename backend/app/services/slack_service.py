@@ -13,9 +13,10 @@ SEVERITY_EMOJI = {
 
 
 class SlackService:
-    def __init__(self):
-        self.webhook_url = os.getenv("SLACK_WEBHOOK_URL", "")
-        self.channel = os.getenv("SLACK_CHANNEL", "#incidents")
+    def __init__(self, config: dict | None = None):
+        config = config or {}
+        self.webhook_url = config.get("webhook_url") or config.get("SLACK_WEBHOOK_URL") or os.getenv("SLACK_WEBHOOK_URL", "")
+        self.channel = config.get("channel") or config.get("SLACK_CHANNEL") or os.getenv("SLACK_CHANNEL", "#incidents")
 
     @property
     def configured(self) -> bool:
@@ -34,7 +35,12 @@ class SlackService:
         )
         return self._post(payload)
 
-    def post_review_request(self, incident: Incident, recommended_actions: list[str] | None = None) -> dict:
+    def post_review_request(
+        self,
+        incident: Incident,
+        recommended_actions: list[str] | None = None,
+        oncall: dict | None = None,
+    ) -> dict:
         if not self.configured:
             return {"posted": False, "reason": "Slack webhook is not configured"}
 
@@ -43,11 +49,12 @@ class SlackService:
             title="Human review requested",
             mode="medium_confidence",
             recommended_actions=recommended_actions or [],
+            oncall=oncall,
             footer="Medium confidence: SentinelAI is waiting for human confirmation.",
         )
         return self._post(payload)
 
-    def post_low_confidence_alert(self, incident: Incident) -> dict:
+    def post_low_confidence_alert(self, incident: Incident, oncall: dict | None = None) -> dict:
         if not self.configured:
             return {"posted": False, "reason": "Slack webhook is not configured"}
 
@@ -56,6 +63,7 @@ class SlackService:
             title="Low-confidence alert",
             mode="low_confidence",
             recommended_actions=["Review telemetry manually", "Check adjacent service health"],
+            oncall=oncall,
             footer="Low confidence: SentinelAI did not take automated action.",
         )
         return self._post(payload)
@@ -67,6 +75,7 @@ class SlackService:
         mode: str,
         recommended_actions: list[str],
         footer: str,
+        oncall: dict | None = None,
     ) -> dict:
         emoji = SEVERITY_EMOJI.get(incident.severity or "", ":white_circle:")
         teams = ", ".join(incident.affected_teams or []) or "not assigned"
@@ -108,6 +117,16 @@ class SlackService:
                         "type": "mrkdwn",
                         "text": f"*Jira ticket:* <{incident.jira_ticket_url}|{incident.jira_ticket_id or 'View ticket'}>",
                     },
+                }
+            )
+
+        if oncall:
+            mention = oncall.get("slack_handle") or oncall.get("name") or "unassigned"
+            team = oncall.get("team") or "unknown team"
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": f"*On-call:*\n{mention} ({team})"},
                 }
             )
 

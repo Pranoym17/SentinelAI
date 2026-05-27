@@ -6,12 +6,14 @@ from app.models import Incident
 
 
 class JiraService:
-    def __init__(self):
-        self.base_url = os.getenv("JIRA_BASE_URL", "").rstrip("/")
-        self.email = os.getenv("JIRA_EMAIL", "")
-        self.api_token = os.getenv("JIRA_API_TOKEN", "")
-        self.project_key = os.getenv("JIRA_PROJECT_KEY", "INC")
-        self.issue_type = os.getenv("JIRA_ISSUE_TYPE", "Bug")
+    def __init__(self, config: dict | None = None):
+        config = config or {}
+        self.base_url = (config.get("base_url") or config.get("JIRA_BASE_URL") or os.getenv("JIRA_BASE_URL", "")).rstrip("/")
+        self.email = config.get("email") or config.get("JIRA_EMAIL") or os.getenv("JIRA_EMAIL", "")
+        self.api_token = config.get("api_token") or config.get("JIRA_API_TOKEN") or os.getenv("JIRA_API_TOKEN", "")
+        self.project_key = config.get("project_key") or config.get("JIRA_PROJECT_KEY") or os.getenv("JIRA_PROJECT_KEY", "INC")
+        self.issue_type = config.get("issue_type") or config.get("JIRA_ISSUE_TYPE") or os.getenv("JIRA_ISSUE_TYPE", "Bug")
+        self.priority_overrides = config.get("priority_overrides") or {}
 
     @property
     def configured(self) -> bool:
@@ -99,7 +101,7 @@ class JiraService:
             "SEV-3": "Medium",
         }
         env_key = f"JIRA_PRIORITY_{(severity or '').replace('-', '_')}"
-        return os.getenv(env_key, defaults.get(severity or ""))
+        return self.priority_overrides.get(severity or "") or os.getenv(env_key, defaults.get(severity or ""))
 
     def _failure_reason(self, exc: requests.RequestException) -> str:
         response = getattr(exc, "response", None)
