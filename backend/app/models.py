@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
@@ -99,3 +99,69 @@ class HealthCheck(Base):
     status: Mapped[str] = mapped_column(String)
     latency_ms: Mapped[float] = mapped_column(Float)
     checked_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class Service(Base):
+    __tablename__ = "services"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    dependencies: Mapped[list[str]] = mapped_column(JSON, default=list)
+    team: Mapped[str | None] = mapped_column(String, nullable=True)
+    repo_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    sla_target: Mapped[float] = mapped_column(Float, default=99.9)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class SLARecord(Base):
+    __tablename__ = "sla_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    service: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    month: Mapped[str] = mapped_column(String, index=True)
+    target_uptime: Mapped[float] = mapped_column(Float, default=99.9)
+    actual_uptime: Mapped[float | None] = mapped_column(Float, nullable=True)
+    total_downtime_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    incident_count: Mapped[int] = mapped_column(Integer, default=0)
+    sla_breached: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class OnCallSchedule(Base):
+    __tablename__ = "on_call_schedule"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    engineer_name: Mapped[str] = mapped_column(String, nullable=False)
+    engineer_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    slack_handle: Mapped[str | None] = mapped_column(String, nullable=True)
+    team: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    start_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    end_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class RunbookLibrary(Base):
+    __tablename__ = "runbook_library"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    service: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    signal_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    steps: Mapped[list[str]] = mapped_column(JSON, default=list)
+    times_used: Mapped[int] = mapped_column(Integer, default=0)
+    times_successful: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class IntegrationConfig(Base):
+    __tablename__ = "integration_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    integration_type: Mapped[str] = mapped_column(String, index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    config: Mapped[dict] = mapped_column(JSON, default=dict)
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
