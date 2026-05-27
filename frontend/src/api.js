@@ -21,6 +21,14 @@ export const api = {
       body: JSON.stringify(config),
     }),
   getMetrics: () => request('/api/metrics'),
+  getDeploys: () => request('/api/deploys'),
+  createDeploy: (deploy) =>
+    request('/api/deploys', {
+      method: 'POST',
+      body: JSON.stringify(deploy),
+    }),
+  getDemoState: () => request('/api/demo/state'),
+  getIntegrationStatus: () => request('/api/integrations/status'),
   seedDemo: () => request('/api/seed/demo', { method: 'POST' }),
   seedDeploys: (deploys) =>
     request('/api/seed/deploys', {

@@ -42,9 +42,26 @@ Demo helpers:
 
 ```powershell
 Invoke-RestMethod -Method Post http://localhost:8000/api/demo/full-seed
+Invoke-RestMethod http://localhost:8000/api/demo/state
 Invoke-RestMethod -Method Post "http://localhost:8000/api/demo/trigger?delay_seconds=30"
 Invoke-RestMethod -Method Post "http://localhost:8000/api/demo/reset?keep_config=true"
 ```
+
+Deploy helpers:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/api/deploys
+```
+
+Integration helpers:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/api/integrations/status
+Invoke-RestMethod -Method Post http://localhost:8000/api/integrations/slack/test
+Invoke-RestMethod -Method Post http://localhost:8000/api/integrations/jira/test
+```
+
+The Slack and Jira test endpoints perform real external actions when credentials are configured.
 
 ## Frontend
 
