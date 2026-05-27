@@ -1,7 +1,6 @@
-from datetime import datetime
-
 from app.models import Incident, TimelineEvent
 from app.services.openai_service import OpenAIService
+from app.time_utils import utc_now
 
 
 class StatusAgent:
@@ -18,7 +17,7 @@ class StatusAgent:
         return self._fallback(incident)
 
     def _context(self, query: str, incident: Incident, timeline: list[TimelineEvent]) -> dict:
-        duration = int((datetime.utcnow() - incident.detected_at).total_seconds() / 60)
+        duration = int((utc_now() - incident.detected_at).total_seconds() / 60)
         return {
             "query": query,
             "incident": {
@@ -42,7 +41,7 @@ class StatusAgent:
         }
 
     def _fallback(self, incident: Incident) -> str:
-        duration = int((datetime.utcnow() - incident.detected_at).total_seconds() / 60)
+        duration = int((utc_now() - incident.detected_at).total_seconds() / 60)
         return (
             f"{incident.service} incident is {incident.status} at {incident.severity}. "
             f"It has been open for {duration} minutes. "

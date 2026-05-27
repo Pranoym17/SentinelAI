@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import HealthCheck, HistoricalIncident, MetricSnapshot, RecentDeploy
+from app.background_worker import worker
+from app.models import HistoricalIncident, RecentDeploy
 from app.schemas import DeploySeedRequest, MemorySeedRequest
+from app.services.demo_service import DemoService
 
 
 router = APIRouter(prefix="/api/seed", tags=["seed"])
@@ -27,12 +29,24 @@ def seed_memory(payload: MemorySeedRequest, db: Session = Depends(get_db)) -> di
 
 @router.post("/demo")
 def seed_demo(db: Session = Depends(get_db)) -> dict:
-    for service in ["database", "redis", "message-queue"]:
-        db.add(HealthCheck(service=service, status="healthy", latency_ms=12.0))
+    return DemoService(db).seed_basics()
 
-    for service in ["payments", "auth", "api-gateway"]:
-        db.add(MetricSnapshot(service=service, metric_type="error_rate", value=0.2, baseline=0.2))
-        db.add(MetricSnapshot(service=service, metric_type="latency_ms", value=145.0, baseline=150.0))
 
-    db.commit()
-    return {"status": "seeded", "health_checks": 3, "metric_snapshots": 6}
+@router.post("/full-demo")
+def seed_full_demo(db: Session = Depends(get_db)) -> dict:
+    return DemoService(db).full_seed()
+
+
+@router.post("/reset")
+def reset_demo(keep_config: bool = True, db: Session = Depends(get_db)) -> dict:
+    return DemoService(db).reset(keep_config=keep_config)
+
+
+@router.post("/trigger")
+def trigger_demo(delay_seconds: int = 30) -> dict:
+    return worker.schedule_payment_spike(delay_seconds=delay_seconds)
+
+
+@router.get("/worker")
+def worker_state() -> dict:
+    return worker.state()

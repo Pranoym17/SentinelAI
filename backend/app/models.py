@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
 from app.database import Base
+from app.time_utils import utc_now
 
 
 class Config(Base):
@@ -17,8 +18,8 @@ class Config(Base):
     thresholds: Mapped[dict] = mapped_column(JSON, default=dict)
     slack_channel: Mapped[str | None] = mapped_column(String, nullable=True)
     jira_project_key: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
 
 
 class Incident(Base):
@@ -40,7 +41,7 @@ class Incident(Base):
     resolution_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     post_mortem: Mapped[str | None] = mapped_column(Text, nullable=True)
     matched_past_incident_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    detected_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    detected_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
@@ -53,7 +54,7 @@ class TimelineEvent(Base):
     event_type: Mapped[str] = mapped_column(String)
     description: Mapped[str] = mapped_column(Text)
     event_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class HistoricalIncident(Base):
@@ -75,7 +76,7 @@ class RecentDeploy(Base):
     service: Mapped[str] = mapped_column(String, index=True)
     version: Mapped[str] = mapped_column(String)
     author: Mapped[str] = mapped_column(String)
-    deployed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    deployed_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     changes_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
@@ -87,7 +88,7 @@ class MetricSnapshot(Base):
     metric_type: Mapped[str] = mapped_column(String, index=True)
     value: Mapped[float] = mapped_column(Float)
     baseline: Mapped[float] = mapped_column(Float)
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
 class HealthCheck(Base):
@@ -97,4 +98,4 @@ class HealthCheck(Base):
     service: Mapped[str] = mapped_column(String, index=True)
     status: Mapped[str] = mapped_column(String)
     latency_ms: Mapped[float] = mapped_column(Float)
-    checked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    checked_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)

@@ -31,6 +31,21 @@ Interactive API docs:
 http://localhost:8000/docs
 ```
 
+Run backend tests:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest --basetemp=.\\.tmp_pytest -p no:cacheprovider
+```
+
+Demo helpers:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:8000/api/demo/full-seed
+Invoke-RestMethod -Method Post "http://localhost:8000/api/demo/trigger?delay_seconds=30"
+Invoke-RestMethod -Method Post "http://localhost:8000/api/demo/reset?keep_config=true"
+```
+
 ## Frontend
 
 ```powershell

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
@@ -6,6 +6,7 @@ from app.agents.types import InvestigationResult
 from app.models import HealthCheck, HistoricalIncident, RecentDeploy
 from app.schemas import SignalIn
 from app.services.openai_service import OpenAIService
+from app.time_utils import utc_now
 
 
 class InvestigatorAgent:
@@ -23,7 +24,7 @@ class InvestigatorAgent:
         return self._fallback_investigation(signal, context), matched_incident_id
 
     def _build_context(self, signal: SignalIn) -> tuple[dict, int | None]:
-        cutoff = datetime.utcnow() - timedelta(minutes=60)
+        cutoff = utc_now() - timedelta(minutes=60)
         recent_deploys = (
             self.db.query(RecentDeploy)
             .filter(
@@ -58,7 +59,7 @@ class InvestigatorAgent:
                     "service": deploy.service,
                     "version": deploy.version,
                     "author": deploy.author,
-                    "minutes_ago": int((datetime.utcnow() - deploy.deployed_at).total_seconds() / 60),
+                    "minutes_ago": int((utc_now() - deploy.deployed_at).total_seconds() / 60),
                     "changes_summary": deploy.changes_summary,
                 }
                 for deploy in recent_deploys

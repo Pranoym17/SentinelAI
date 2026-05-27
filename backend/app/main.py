@@ -1,14 +1,27 @@
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
 from app import models  # noqa: F401
-from app.routers import config, incidents, metrics, seed
+from app.routers import config, demo, incidents, metrics, seed
 
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="SentinelAI API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if os.getenv("SENTINEL_WORKER_ENABLED", "true").lower() == "true":
+        from app.background_worker import worker
+
+        worker.start()
+    yield
+
+
+app = FastAPI(title="SentinelAI API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,4 +40,5 @@ def health() -> dict[str, str]:
 app.include_router(config.router)
 app.include_router(metrics.router)
 app.include_router(seed.router)
+app.include_router(demo.router)
 app.include_router(incidents.router)

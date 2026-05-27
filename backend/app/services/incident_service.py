@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from sqlalchemy.orm import Session
 
 from app.models import Config, Incident
@@ -10,6 +8,7 @@ from app.agents.status_agent import StatusAgent
 from app.services.memory_service import MemoryService
 from app.services.serializers import serialize_incident
 from app.services.timeline_service import TimelineService
+from app.time_utils import utc_now
 
 
 def severity_for_signal(payload: SignalIn) -> str:
@@ -47,7 +46,7 @@ class IncidentService:
 
     def resolve(self, incident: Incident, payload: ResolveIncidentIn) -> dict:
         incident.status = "resolved"
-        incident.resolved_at = datetime.utcnow()
+        incident.resolved_at = utc_now()
         incident.resolution_text = payload.resolution_text
         incident.duration_minutes = max(
             0,
