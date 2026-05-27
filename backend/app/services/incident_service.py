@@ -4,9 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Config, Incident
 from app.schemas import ResolveIncidentIn, SignalIn, StatusQueryIn
+from app.agents.incident_orchestrator import IncidentOrchestrator
 from app.services.memory_service import MemoryService
-from app.services.metrics_service import MetricsService
-from app.services.response_agent import ResponseAgent
 from app.services.serializers import serialize_incident
 from app.services.timeline_service import TimelineService
 
@@ -22,7 +21,6 @@ def severity_for_signal(payload: SignalIn) -> str:
 class IncidentService:
     def __init__(self, db: Session):
         self.db = db
-        self.metrics = MetricsService(db)
         self.timeline = TimelineService(db)
         self.memory = MemoryService(db)
 
@@ -31,59 +29,7 @@ class IncidentService:
 
     def create_from_signal(self, payload: SignalIn) -> dict:
         config = self.latest_config()
-        self.metrics.record_signal(payload.service, payload.type, payload.value, payload.baseline)
-        past_matches = self.memory.find_matches(payload.service, payload.type, limit=1)
-        confidence = 80 if payload.value > payload.baseline else 35
-        if past_matches:
-            confidence = min(95, confidence + 10)
-
-        severity = severity_for_signal(payload)
-        reasoning_chain = [
-            {
-                "step": "SIGNAL DETECTED",
-                "detail": f"{payload.service} {payload.type} at {payload.value} vs baseline {payload.baseline}",
-                "confidence": 30,
-            },
-            {
-                "step": "CHECKING MEMORY",
-                "detail": (
-                    f"Found matching historical incident #{past_matches[0].id}"
-                    if past_matches
-                    else "No matching historical incident found yet."
-                ),
-                "confidence": confidence,
-            },
-        ]
-        incident = Incident(
-            service=payload.service,
-            signal_type=payload.type,
-            signal_value=payload.value,
-            severity=severity,
-            hypothesis=f"{payload.service} is showing an anomalous {payload.type}. Investigation pending.",
-            confidence=confidence,
-            reasoning_chain=reasoning_chain,
-            affected_teams=[payload.service, "platform"],
-            matched_past_incident_id=past_matches[0].id if past_matches else None,
-        )
-        self.db.add(incident)
-        self.db.flush()
-
-        event = self.timeline.append(
-            incident.id,
-            "detection",
-            f"{payload.type} detected for {payload.service}: {payload.value}",
-            {"baseline": payload.baseline, "unit": payload.unit},
-        )
-        self.db.commit()
-        self.db.refresh(incident)
-        actions_taken = ResponseAgent(self.db, config).route(incident) if config else []
-        timeline = self.timeline.get(incident.id)
-
-        return {
-            **serialize_incident(incident, timeline),
-            "triggered": True,
-            "actions_taken": actions_taken,
-        }
+        return IncidentOrchestrator(self.db).handle_signal(payload, config)
 
     def list(self) -> dict:
         incidents = self.db.query(Incident).order_by(Incident.detected_at.desc()).all()

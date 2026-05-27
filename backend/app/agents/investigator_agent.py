@@ -1,0 +1,172 @@
+from datetime import datetime, timedelta
+
+from sqlalchemy.orm import Session
+
+from app.agents.types import InvestigationResult
+from app.models import HealthCheck, HistoricalIncident, RecentDeploy
+from app.schemas import SignalIn
+from app.services.openai_service import OpenAIService
+
+
+class InvestigatorAgent:
+    def __init__(self, db: Session):
+        self.db = db
+        self.openai = OpenAIService()
+
+    def investigate(self, signal: SignalIn) -> tuple[InvestigationResult, int | None]:
+        context, matched_incident_id = self._build_context(signal)
+        if self.openai.configured:
+            try:
+                return self.openai.investigate(signal.model_dump(), context), matched_incident_id
+            except Exception:
+                return self._fallback_investigation(signal, context), matched_incident_id
+        return self._fallback_investigation(signal, context), matched_incident_id
+
+    def _build_context(self, signal: SignalIn) -> tuple[dict, int | None]:
+        cutoff = datetime.utcnow() - timedelta(minutes=60)
+        recent_deploys = (
+            self.db.query(RecentDeploy)
+            .filter(
+                RecentDeploy.service.contains(signal.service),
+                RecentDeploy.deployed_at >= cutoff,
+            )
+            .order_by(RecentDeploy.deployed_at.desc())
+            .limit(5)
+            .all()
+        )
+        past_incidents = (
+            self.db.query(HistoricalIncident)
+            .filter(
+                HistoricalIncident.service == signal.service,
+                HistoricalIncident.signal_type == signal.type,
+            )
+            .order_by(HistoricalIncident.occurred_at.desc())
+            .limit(3)
+            .all()
+        )
+        health_checks = (
+            self.db.query(HealthCheck)
+            .order_by(HealthCheck.checked_at.desc())
+            .limit(10)
+            .all()
+        )
+        matched_incident_id = past_incidents[0].id if past_incidents else None
+
+        context = {
+            "recent_deploys": [
+                {
+                    "service": deploy.service,
+                    "version": deploy.version,
+                    "author": deploy.author,
+                    "minutes_ago": int((datetime.utcnow() - deploy.deployed_at).total_seconds() / 60),
+                    "changes_summary": deploy.changes_summary,
+                }
+                for deploy in recent_deploys
+            ],
+            "past_incidents": [
+                {
+                    "id": incident.id,
+                    "root_cause": incident.root_cause,
+                    "resolution": incident.resolution,
+                    "duration_minutes": incident.duration_minutes,
+                }
+                for incident in past_incidents
+            ],
+            "health_checks": [
+                {
+                    "service": check.service,
+                    "status": check.status,
+                    "latency_ms": check.latency_ms,
+                }
+                for check in health_checks
+            ],
+        }
+        return context, matched_incident_id
+
+    def _fallback_investigation(self, signal: SignalIn, context: dict) -> InvestigationResult:
+        confidence = 30
+        reasoning_chain = [
+            {
+                "step": "SIGNAL DETECTED",
+                "detail": f"{signal.service} {signal.type} is {signal.value} vs baseline {signal.baseline}.",
+                "confidence": confidence,
+            }
+        ]
+
+        if context["past_incidents"]:
+            confidence += 25
+            match = context["past_incidents"][0]
+            reasoning_chain.append(
+                {
+                    "step": "CHECKING MEMORY",
+                    "detail": f"Found matching incident #{match['id']}: {match['root_cause']}",
+                    "confidence": confidence,
+                }
+            )
+        else:
+            reasoning_chain.append(
+                {
+                    "step": "CHECKING MEMORY",
+                    "detail": "No matching historical incident found.",
+                    "confidence": confidence,
+                }
+            )
+
+        if context["recent_deploys"]:
+            confidence += 25
+            deploy = context["recent_deploys"][0]
+            reasoning_chain.append(
+                {
+                    "step": "CHECKING DEPLOYS",
+                    "detail": (
+                        f"{deploy['service']} {deploy['version']} was deployed "
+                        f"{deploy['minutes_ago']} minutes ago: {deploy['changes_summary']}"
+                    ),
+                    "confidence": confidence,
+                }
+            )
+        else:
+            reasoning_chain.append(
+                {
+                    "step": "CHECKING DEPLOYS",
+                    "detail": "No recent deploy found in the last 60 minutes.",
+                    "confidence": confidence,
+                }
+            )
+
+        healthy_dependencies = all(check["status"] == "healthy" for check in context["health_checks"])
+        if healthy_dependencies and context["health_checks"]:
+            confidence += 15
+            health_detail = "Dependencies are healthy, making an app-layer regression more likely."
+        else:
+            health_detail = "Dependency health is degraded or unknown."
+
+        confidence = min(confidence, 95)
+        severity = "SEV-1" if signal.type == "error_spike" and signal.value >= 10 else "SEV-2"
+        reasoning_chain.append(
+            {
+                "step": "CHECKING HEALTH",
+                "detail": health_detail,
+                "confidence": confidence,
+            }
+        )
+        reasoning_chain.append(
+            {
+                "step": "HYPOTHESIS",
+                "detail": f"Likely regression affecting {signal.service}. Confidence: {confidence}%.",
+                "confidence": confidence,
+            }
+        )
+
+        return InvestigationResult(
+            reasoning_chain=reasoning_chain,
+            hypothesis=f"Likely regression affecting {signal.service}, correlated with recent deploy or known pattern.",
+            confidence=confidence,
+            severity=severity,
+            affected_teams=[signal.service, "platform"],
+            recommended_actions=[
+                f"Review recent {signal.service} deploys",
+                "Check exception logs",
+                "Prepare rollback if errors remain elevated",
+            ],
+        )
