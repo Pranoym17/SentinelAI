@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -30,6 +30,22 @@ def get_incident(incident_id: int, db: Session = Depends(get_db)) -> dict:
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
     return service.detail(incident)
+
+
+@router.get("/api/incidents/{incident_id}/post-mortem.md")
+def download_post_mortem(incident_id: int, db: Session = Depends(get_db)) -> Response:
+    service = IncidentService(db)
+    incident = service.get(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    if not incident.post_mortem:
+        raise HTTPException(status_code=404, detail="Post-mortem not found")
+    filename = f"sentinelai-incident-{incident_id}-post-mortem.md"
+    return Response(
+        content=incident.post_mortem,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/api/incidents/{incident_id}/resolve")

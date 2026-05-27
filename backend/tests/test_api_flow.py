@@ -127,6 +127,11 @@ def test_status_and_resolution_generate_post_mortem(client):
     assert resolved["status"] == "resolved"
     assert "INCIDENT POST-MORTEM" in resolved["post_mortem"]
 
+    markdown = client.get(f"/api/incidents/{incident['incident_id']}/post-mortem.md")
+    assert markdown.status_code == 200
+    assert "text/markdown" in markdown.headers["content-type"]
+    assert "INCIDENT POST-MORTEM" in markdown.text
+
 
 def test_rollback_simulation_logs_and_normalizes_metric(client):
     assert save_config(client).status_code == 200
