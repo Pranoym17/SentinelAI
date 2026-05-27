@@ -29,6 +29,32 @@ export const api = {
     }),
   getDemoState: () => request('/api/demo/state'),
   getIntegrationStatus: () => request('/api/integrations/status'),
+  getIntegrations: () => request('/api/integrations'),
+  saveIntegration: (integration) =>
+    request('/api/integrations', {
+      method: 'POST',
+      body: JSON.stringify(integration),
+    }),
+  getServices: () => request('/api/services'),
+  createService: (service) =>
+    request('/api/services', {
+      method: 'POST',
+      body: JSON.stringify(service),
+    }),
+  getSla: () => request('/api/sla'),
+  getCurrentOncall: () => request('/api/oncall/current'),
+  createOncall: (schedule) =>
+    request('/api/oncall', {
+      method: 'POST',
+      body: JSON.stringify(schedule),
+    }),
+  getRunbooks: () => request('/api/runbooks'),
+  createRunbook: (runbook) =>
+    request('/api/runbooks', {
+      method: 'POST',
+      body: JSON.stringify(runbook),
+    }),
+  getAnalytics: () => request('/api/analytics'),
   getIncidents: () => request('/api/incidents'),
   getIncident: (incidentId) => request(`/api/incidents/${incidentId}`),
   getMetricHistory: (limit = 120) => request(`/api/metrics/history?limit=${limit}`),

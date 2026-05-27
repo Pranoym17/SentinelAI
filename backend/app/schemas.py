@@ -72,3 +72,36 @@ class RollbackIn(BaseModel):
 class StatusQueryIn(BaseModel):
     query: str = "What is the status?"
     incident_id: int | None = None
+
+
+class ServiceIn(BaseModel):
+    name: str
+    display_name: str | None = None
+    description: str | None = None
+    dependencies: list[str] = Field(default_factory=list)
+    team: str | None = None
+    repo_url: str | None = None
+    sla_target: float = 99.9
+
+
+class OnCallScheduleIn(BaseModel):
+    engineer_name: str
+    engineer_email: str | None = None
+    slack_handle: str | None = None
+    team: str | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    is_active: bool = True
+
+
+class RunbookIn(BaseModel):
+    service: str | None = None
+    signal_type: str | None = None
+    title: str
+    steps: list[str] = Field(default_factory=list)
+
+
+class IntegrationConfigIn(BaseModel):
+    type: str
+    enabled: bool = True
+    config: dict[str, Any] = Field(default_factory=dict)

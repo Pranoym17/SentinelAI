@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
 from app import models  # noqa: F401
-from app.routers import config, demo, deploys, incidents, integrations, metrics, seed
+from app.routers import analytics, config, demo, deploys, incidents, integrations, metrics, oncall, runbooks, seed, services, sla
 
 
 Base.metadata.create_all(bind=engine)
@@ -44,3 +44,8 @@ app.include_router(seed.router)
 app.include_router(demo.router)
 app.include_router(incidents.router)
 app.include_router(integrations.router)
+app.include_router(services.router)
+app.include_router(sla.router)
+app.include_router(oncall.router)
+app.include_router(runbooks.router)
+app.include_router(analytics.router)
