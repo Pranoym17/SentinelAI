@@ -35,6 +35,8 @@ def serialize_incident(incident: Incident, timeline: list[TimelineEvent] | None 
         "hypothesis": incident.hypothesis,
         "confidence": incident.confidence,
         "reasoning_chain": incident.reasoning_chain or [],
+        "recommended_actions": incident.recommended_actions or [],
+        "raw_model_response": incident.raw_model_response,
         "affected_teams": incident.affected_teams or [],
         "jira_ticket_id": incident.jira_ticket_id,
         "jira_ticket_url": incident.jira_ticket_url,

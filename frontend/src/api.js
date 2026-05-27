@@ -35,6 +35,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(integration),
     }),
+  testIntegration: (type) => request(`/api/integrations/${type}/test`, { method: 'POST' }),
   getServices: () => request('/api/services'),
   createService: (service) =>
     request('/api/services', {

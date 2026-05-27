@@ -79,6 +79,9 @@ export default function Dashboard() {
   const activeTimeline = incident?.timeline || state?.timeline || [];
   const slaWarning = activeTimeline.find((event) => event.event_type === 'sla_warning');
   const correlation = activeTimeline.find((event) => event.event_type === 'correlation_detected');
+  const agentStep = activeTimeline.findLast?.((event) =>
+    ['detection', 'investigation_completed', 'jira_created', 'slack_sent', 'rollback_completed'].includes(event.event_type),
+  );
 
   return (
     <main className="dashboard-shell">
@@ -94,6 +97,14 @@ export default function Dashboard() {
       </header>
 
       {error && <div className="notice">{error}</div>}
+      <section className="panel agent-stepper">
+        {['detection', 'investigation_completed', 'jira_created', 'slack_sent', 'rollback_completed'].map((step) => (
+          <span className={activeTimeline.some((event) => event.event_type === step) ? 'done' : ''} key={step}>
+            {step.replaceAll('_', ' ')}
+          </span>
+        ))}
+        <strong>{countdown ? `Autonomous detection in ${countdown}s` : agentStep ? `Latest: ${agentStep.event_type.replaceAll('_', ' ')}` : 'Agent is watching'}</strong>
+      </section>
 
       <DemoControlBar
         busy={busy}

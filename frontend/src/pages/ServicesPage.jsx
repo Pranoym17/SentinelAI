@@ -1,16 +1,28 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Card, StatusDot } from '../components/ui.jsx';
+import { Card, EmptyState, StatusDot } from '../components/ui.jsx';
 
 export default function ServicesPage() {
   const [services, setServices] = useState([]);
   const [sla, setSla] = useState([]);
   const [draft, setDraft] = useState({ name: '', display_name: '', team: '', sla_target: 99.9 });
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   async function load() {
-    const [serviceData, slaData] = await Promise.all([api.getServices(), api.getSla()]);
-    setServices(serviceData.services || []);
-    setSla(slaData.sla || []);
+    setLoading(true);
+    setError('');
+    try {
+      const [serviceData, slaData] = await Promise.all([api.getServices(), api.getSla()]);
+      setServices(serviceData.services || []);
+      setSla(slaData.sla || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -19,9 +31,18 @@ export default function ServicesPage() {
 
   async function create() {
     if (!draft.name) return;
-    await api.createService(draft);
-    setDraft({ name: '', display_name: '', team: '', sla_target: 99.9 });
-    await load();
+    setBusy(true);
+    setError('');
+    try {
+      await api.createService(draft);
+      setDraft({ name: '', display_name: '', team: '', sla_target: 99.9 });
+      setMessage('Service created');
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -32,7 +53,13 @@ export default function ServicesPage() {
           <h1>Services</h1>
         </div>
       </div>
+      {message && <div className="notice success">{message}</div>}
+      {error && <div className="notice">{error}</div>}
+      {loading && <Card><EmptyState title="Loading services" copy="Fetching service catalog and SLA records." /></Card>}
       <div className="service-grid">
+        {!loading && services.length === 0 && (
+          <Card><EmptyState title="No services configured" copy="Add the first monitored service below." /></Card>
+        )}
         {services.map((service) => {
           const status = sla.find((item) => item.service === service.name);
           return (
@@ -59,7 +86,9 @@ export default function ServicesPage() {
           <input placeholder="team" value={draft.team} onChange={(event) => setDraft({ ...draft, team: event.target.value })} />
           <input type="number" value={draft.sla_target} onChange={(event) => setDraft({ ...draft, sla_target: Number(event.target.value) })} />
         </div>
-        <button type="button" onClick={create}>Create service</button>
+        <button type="button" disabled={busy || !draft.name.trim()} onClick={create}>
+          {busy ? 'Creating...' : 'Create service'}
+        </button>
       </Card>
     </main>
   );

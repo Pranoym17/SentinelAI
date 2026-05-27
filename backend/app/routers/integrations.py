@@ -32,3 +32,8 @@ def test_slack(db: Session = Depends(get_db)) -> dict:
 @router.post("/jira/test")
 def test_jira(db: Session = Depends(get_db)) -> dict:
     return IntegrationService(db).test_jira()
+
+
+@router.post("/github/test")
+def test_github(db: Session = Depends(get_db)) -> dict:
+    return IntegrationService(db).test_github()

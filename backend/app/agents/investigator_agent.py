@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.agents.types import InvestigationResult
 from app.models import HealthCheck, HistoricalIncident, RecentDeploy
 from app.schemas import SignalIn
+from app.services.github_service import GitHubService
 from app.services.openai_service import OpenAIService
 from app.services.runbook_service import RunbookService
 from app.time_utils import utc_now
@@ -53,6 +54,7 @@ class InvestigatorAgent:
             .all()
         )
         matching_runbooks = RunbookService(self.db).matching(signal.service, signal.type, mark_used=True)
+        recent_commits = GitHubService(self.db).recent_commits_for_service(signal.service, since_minutes=60)
         matched_incident_id = past_incidents[0].id if past_incidents else None
 
         context = {
@@ -93,6 +95,7 @@ class InvestigatorAgent:
                 }
                 for runbook in matching_runbooks
             ],
+            "recent_commits": recent_commits,
         }
         return context, matched_incident_id
 
@@ -143,6 +146,17 @@ class InvestigatorAgent:
                 {
                     "step": "CHECKING DEPLOYS",
                     "detail": "No recent deploy found in the last 60 minutes.",
+                    "confidence": confidence,
+                }
+            )
+
+        if context.get("recent_commits"):
+            commit = context["recent_commits"][0]
+            changed = ", ".join(commit.get("files_changed") or []) or "files unavailable"
+            reasoning_chain.append(
+                {
+                    "step": "CHECKING COMMITS",
+                    "detail": f"Recent commit {commit['sha']} by {commit.get('author')}: {commit['message']} ({changed})",
                     "confidence": confidence,
                 }
             )

@@ -87,14 +87,13 @@ class IncidentService:
                 "sla_breached": sla_record.sla_breached,
             },
         )
-        successful_runbooks = self.runbooks.mark_successful(incident.service, incident.signal_type)
-        if successful_runbooks:
-            self.timeline.append(
-                incident.id,
-                "runbook_success_recorded",
-                f"Marked {len(successful_runbooks)} matching runbook(s) successful",
-                {"runbook_ids": [runbook.id for runbook in successful_runbooks]},
-            )
+        runbook = self.runbooks.create_or_update_from_incident(incident)
+        self.timeline.append(
+            incident.id,
+            "runbook_success_recorded",
+            f"Updated successful runbook: {runbook.title}",
+            {"runbook_id": runbook.id, "steps_count": len(runbook.steps or [])},
+        )
         self.db.commit()
         self.db.refresh(incident)
 

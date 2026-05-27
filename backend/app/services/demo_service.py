@@ -94,6 +94,6 @@ class DemoService:
             "metrics": MetricsService(self.db).latest()["metrics"],
             "active_incident": serialize_incident(active_incident, timeline_events) if active_incident else None,
             "recent_deploys": DeployService(self.db).list(limit=10)["deploys"],
-            "integrations": IntegrationService().status(),
+            "integrations": IntegrationService(self.db).status(),
             "timeline": [serialize_timeline(event) for event in timeline_events],
         }

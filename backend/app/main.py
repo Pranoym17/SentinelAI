@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 
 from app.database import Base, engine
 from app import models  # noqa: F401
@@ -10,6 +11,28 @@ from app.routers import analytics, config, demo, deploys, incidents, integration
 
 
 Base.metadata.create_all(bind=engine)
+
+
+def _apply_sqlite_compat_migrations():
+    if not str(engine.url).startswith("sqlite"):
+        return
+    inspector = inspect(engine)
+    if "incidents" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("incidents")}
+    statements = []
+    if "recommended_actions" not in columns:
+        statements.append("ALTER TABLE incidents ADD COLUMN recommended_actions JSON")
+    if "raw_model_response" not in columns:
+        statements.append("ALTER TABLE incidents ADD COLUMN raw_model_response TEXT")
+    if not statements:
+        return
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+
+
+_apply_sqlite_compat_migrations()
 
 
 @asynccontextmanager

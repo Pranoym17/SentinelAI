@@ -14,6 +14,7 @@ class InvestigationResult(BaseModel):
     severity: str
     affected_teams: list[str]
     recommended_actions: list[str]
+    raw_model_response: str | None = None
 
 
 class StatusResult(BaseModel):

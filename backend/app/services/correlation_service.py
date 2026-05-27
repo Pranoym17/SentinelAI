@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Incident, Service
 from app.schemas import SignalIn
+from app.services.openai_service import OpenAIService
 from app.time_utils import utc_now
 
 
@@ -52,7 +53,44 @@ class CorrelationService:
                     "primary_incident_id": incident.id,
                     "root_cause": root_cause,
                     "evidence": "; ".join(evidence),
+                    "correlation_group": f"corr-{incident.id}",
                     "affected_services": affected_services,
                 }
 
+        ai_result = self._openai_correlation(signal, recent_incidents)
+        if ai_result.get("correlated"):
+            primary = recent_incidents[0]
+            return {
+                "correlated": True,
+                "primary_incident_id": primary.id,
+                "root_cause": ai_result.get("root_cause", "AI detected a likely shared root cause"),
+                "evidence": ai_result.get("evidence", "OpenAI correlation judgement"),
+                "correlation_group": f"corr-{primary.id}",
+                "affected_services": sorted({primary.service, signal.service}),
+            }
+
         return {"correlated": False}
+
+    def _openai_correlation(self, signal: SignalIn, incidents: list[Incident]) -> dict:
+        openai = OpenAIService()
+        if not openai.configured:
+            return {"correlated": False}
+        try:
+            return openai.correlate_incidents(
+                {
+                    "new_signal": signal.model_dump(),
+                    "open_incidents": [
+                        {
+                            "id": incident.id,
+                            "service": incident.service,
+                            "signal_type": incident.signal_type,
+                            "signal_value": incident.signal_value,
+                            "hypothesis": incident.hypothesis,
+                            "detected_at": incident.detected_at.isoformat(),
+                        }
+                        for incident in incidents
+                    ],
+                }
+            )
+        except Exception:
+            return {"correlated": False}

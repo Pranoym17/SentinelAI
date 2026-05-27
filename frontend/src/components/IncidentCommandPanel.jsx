@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, ExternalLink, MessageSquare, Network, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, MessageSquare, Network, ShieldAlert } from 'lucide-react';
 
 import { api } from '../api.js';
 import { TerminalPanel } from './ui.jsx';
@@ -20,6 +20,13 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
       </section>
     );
   }
+
+  const timeline = incident.timeline || [];
+  const oncallEvent = timeline.find((event) => event.event_type === 'oncall_identified');
+  const slaEvent = timeline.find((event) => event.event_type === 'sla_warning');
+  const correlationEvent = timeline.find((event) => event.event_type === 'correlation_detected');
+  const runbookEvent = timeline.find((event) => event.event_type === 'runbook_success_recorded');
+  const slackEvent = timeline.find((event) => event.event_type.startsWith('slack_'));
 
   async function askStatus() {
     setBusy(true);
@@ -53,18 +60,15 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
     }
   }
 
-  const timeline = incident.timeline || [];
-  const oncallEvent = timeline.find((event) => event.event_type === 'oncall_identified');
-  const slaEvent = timeline.find((event) => event.event_type === 'sla_warning');
-  const correlationEvent = timeline.find((event) => event.event_type === 'correlation_detected');
-
   return (
     <section className="panel incident-panel command-panel">
       <div className="section-heading">
         <div>
           <p className="eyebrow">Incident Command</p>
-          <h2>
-            {incident.severity}: {incident.service}
+          <h2 className="incident-title">
+            <span>{incident.severity}: {incident.service}</span>
+            {slaEvent && <span className="header-badge warning">SLA risk</span>}
+            {correlationEvent && <span className="header-badge">Correlated</span>}
           </h2>
         </div>
         <div className="confidence">{incident.confidence}%</div>
@@ -81,17 +85,30 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
         ) : (
           <span>Jira pending</span>
         )}
-        {(incident.timeline || []).some((event) => event.event_type === 'slack_sent') ? (
+        {slackEvent ? (
           <span>
             <CheckCircle2 size={16} />
-            Slack sent
+            {slackEvent.event_type.replaceAll('_', ' ')}
           </span>
         ) : (
           <span>Slack pending</span>
         )}
         {oncallEvent && <span>On-call found</span>}
-        {slaEvent && <span>SLA risk</span>}
-        {correlationEvent && <span>Correlated</span>}
+      </div>
+
+      <div className="status-grid">
+        <div>
+          <strong>Jira</strong>
+          {incident.jira_ticket_url ? (
+            <a href={incident.jira_ticket_url} target="_blank" rel="noreferrer">{incident.jira_ticket_id}</a>
+          ) : (
+            <span>Not created</span>
+          )}
+        </div>
+        <div>
+          <strong>Slack</strong>
+          <span>{slackEvent?.description || 'No Slack event yet'}</span>
+        </div>
       </div>
 
       {(incident.recommended_actions || []).length > 0 && (
@@ -107,24 +124,16 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
 
       {(oncallEvent || slaEvent || correlationEvent) && (
         <div className="insight-grid">
-          {oncallEvent && (
-            <div>
-              <strong>On-call</strong>
-              <span>{oncallEvent.description}</span>
-            </div>
-          )}
-          {slaEvent && (
-            <div>
-              <strong>SLA</strong>
-              <span>{slaEvent.description}</span>
-            </div>
-          )}
-          {correlationEvent && (
-            <div>
-              <strong>Correlation</strong>
-              <span>{correlationEvent.description}</span>
-            </div>
-          )}
+          {oncallEvent && <Insight title="On-call" copy={oncallEvent.description} />}
+          {slaEvent && <Insight title="SLA" copy={slaEvent.description} />}
+          {correlationEvent && <Insight title="Correlation" copy={correlationEvent.description} />}
+        </div>
+      )}
+
+      {(runbookEvent || incident.matched_past_incident_id) && (
+        <div className="warning-box neutral">
+          <AlertTriangle size={18} />
+          <span>{runbookEvent?.description || `Matched historical incident #${incident.matched_past_incident_id}`}</span>
         </div>
       )}
 
@@ -133,17 +142,13 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
       <div className="query-row">
         <MessageSquare size={18} />
         <input value={query} onChange={(event) => setQuery(event.target.value)} />
-        <button type="button" disabled={busy} onClick={askStatus}>
-          Ask
-        </button>
+        <button type="button" disabled={busy} onClick={askStatus}>Ask</button>
       </div>
       {status && <p className="status-response">{status}</p>}
 
       <div className="query-row">
         <Network size={18} />
-        <button type="button" disabled={busy} onClick={analyzeBlastRadius}>
-          Analyze blast radius
-        </button>
+        <button type="button" disabled={busy} onClick={analyzeBlastRadius}>Analyze blast radius</button>
       </div>
       {blastRadius && (
         <div className="modal-backdrop" role="dialog" aria-label="Blast radius analysis">
@@ -153,16 +158,10 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
                 <p className="eyebrow">Blast radius</p>
                 <h2>{blastRadius.risk_level} risk</h2>
               </div>
-              <button type="button" className="ghost-button icon-button" onClick={() => setBlastRadius(null)}>
-                ×
-              </button>
+              <button type="button" className="ghost-button icon-button" onClick={() => setBlastRadius(null)}>x</button>
             </div>
             <p className="muted">{blastRadius.warning || 'No connected services found.'}</p>
-            {(blastRadius.affected_services || []).length > 0 && (
-              <div className="pill-row">
-                {blastRadius.affected_services.map((service) => <span key={service}>{service}</span>)}
-              </div>
-            )}
+            <BlastGrid blastRadius={blastRadius} />
           </div>
         </div>
       )}
@@ -170,10 +169,40 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
       <div className="query-row">
         <CheckCircle2 size={18} />
         <input value={resolution} onChange={(event) => setResolution(event.target.value)} />
-        <button type="button" disabled={busy || !resolution.trim()} onClick={resolve}>
-          Resolve
-        </button>
+        <button type="button" disabled={busy || !resolution.trim()} onClick={resolve}>Resolve</button>
       </div>
     </section>
+  );
+}
+
+function Insight({ title, copy }) {
+  return (
+    <div>
+      <strong>{title}</strong>
+      <span>{copy}</span>
+    </div>
+  );
+}
+
+export function BlastGrid({ blastRadius }) {
+  return (
+    <div className="blast-grid">
+      <div>
+        <strong>Upstream</strong>
+        {(blastRadius.upstream_dependencies || []).length ? (
+          blastRadius.upstream_dependencies.map((service) => <span key={service}>{service}</span>)
+        ) : (
+          <small>None recorded</small>
+        )}
+      </div>
+      <div>
+        <strong>Downstream</strong>
+        {(blastRadius.downstream_dependents || []).length ? (
+          blastRadius.downstream_dependents.map((service) => <span key={service}>{service}</span>)
+        ) : (
+          <small>None recorded</small>
+        )}
+      </div>
+    </div>
   );
 }

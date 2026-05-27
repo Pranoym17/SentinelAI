@@ -1,7 +1,9 @@
 import os
 import json
+import time
 
 from openai import OpenAI
+from pydantic import ValidationError
 
 from app.agents.types import INVESTIGATION_JSON_SCHEMA, STATUS_JSON_SCHEMA, InvestigationResult, StatusResult
 
@@ -27,49 +29,44 @@ class OpenAIService:
         if not self.client:
             raise RuntimeError("OpenAI client is not configured")
 
-        response = self.client.chat.completions.create(
-            model=self.model,
+        content = self._completion_json(
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an autonomous incident response investigator. "
-                        "Use only the provided signal and context. Return valid JSON matching the schema. "
-                        "Confidence should increase when memory, recent deploys, and healthy dependencies corroborate a cause."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        {
-                            "signal": signal,
-                            "context": context,
-                            "severity_rules": {
-                                "SEV-1": "User-facing service is down or severely degraded.",
-                                "SEV-2": "Partial degradation or non-critical service affected.",
-                                "SEV-3": "Minor issue with low user impact.",
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an autonomous incident response investigator. "
+                            "Use only the provided signal and context. Return valid JSON matching the schema. "
+                            "Reference recent GitHub commit SHAs, changed files, runbooks, memory, deploys, and health when present."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "signal": signal,
+                                "context": context,
+                                "severity_rules": {
+                                    "SEV-1": "User-facing service is down or severely degraded.",
+                                    "SEV-2": "Partial degradation or non-critical service affected.",
+                                    "SEV-3": "Minor issue with low user impact.",
+                                },
                             },
-                        },
-                        indent=2,
-                        default=str,
-                    ),
-                },
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": INVESTIGATION_JSON_SCHEMA,
-            },
-            temperature=0.2,
+                            indent=2,
+                            default=str,
+                        ),
+                    },
+                ],
+            schema=INVESTIGATION_JSON_SCHEMA,
         )
-        content = response.choices[0].message.content or "{}"
-        return InvestigationResult.model_validate_json(content)
+        result = InvestigationResult.model_validate_json(content)
+        result.raw_model_response = content
+        return result
 
     def generate_status(self, context: dict) -> str:
         if not self.client:
             raise RuntimeError("OpenAI client is not configured")
 
-        response = self.client.chat.completions.create(
-            model=self.model,
+        content = self._completion_json(
             messages=[
                 {
                     "role": "system",
@@ -80,10 +77,8 @@ class OpenAIService:
                 },
                 {"role": "user", "content": json.dumps(context, indent=2, default=str)},
             ],
-            response_format={"type": "json_schema", "json_schema": STATUS_JSON_SCHEMA},
-            temperature=0.2,
+            schema=STATUS_JSON_SCHEMA,
         )
-        content = response.choices[0].message.content or "{}"
         return StatusResult.model_validate_json(content).response
 
     def generate_post_mortem(self, context: dict) -> str:
@@ -107,3 +102,65 @@ class OpenAIService:
             temperature=0.2,
         )
         return response.choices[0].message.content or ""
+
+    def correlate_incidents(self, context: dict) -> dict:
+        if not self.client:
+            raise RuntimeError("OpenAI client is not configured")
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Decide if incidents are likely correlated. Return compact JSON only.",
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "context": context,
+                            "schema": {
+                                "correlated": "boolean",
+                                "root_cause": "string",
+                                "evidence": "string",
+                            },
+                        },
+                        indent=2,
+                        default=str,
+                    ),
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+        )
+        return json.loads(response.choices[0].message.content or "{}")
+
+    def _completion_json(self, messages: list[dict], schema: dict, attempts: int = 2) -> str:
+        last_error = None
+        for attempt in range(attempts):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    response_format={"type": "json_schema", "json_schema": schema},
+                    temperature=0.2,
+                    timeout=20,
+                )
+                content = response.choices[0].message.content or "{}"
+                if schema["name"] == "incident_investigation":
+                    InvestigationResult.model_validate_json(content)
+                elif schema["name"] == "incident_status":
+                    StatusResult.model_validate_json(content)
+                return content
+            except (ValidationError, json.JSONDecodeError, Exception) as exc:
+                last_error = exc
+                if attempt == attempts - 1:
+                    break
+                messages = [
+                    *messages,
+                    {
+                        "role": "user",
+                        "content": f"Your previous response failed validation: {exc}. Return valid JSON only.",
+                    },
+                ]
+                time.sleep(0.2)
+        raise RuntimeError(f"OpenAI JSON response failed after {attempts} attempt(s): {last_error}")

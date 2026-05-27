@@ -330,6 +330,102 @@ h2 { font-size: 1.1rem; }
   gap: 10px;
   padding: 12px;
 }
+.notice.success {
+  border-color: var(--healthy);
+  color: var(--healthy);
+}
+.warning-box.neutral {
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.incident-title {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.header-badge {
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.72rem;
+  padding: 3px 8px;
+}
+.header-badge.warning {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.status-grid,
+.blast-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 14px 0;
+}
+.status-grid div,
+.blast-grid div {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+}
+.status-grid strong,
+.blast-grid strong {
+  color: var(--accent);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+.status-grid span,
+.status-grid a,
+.blast-grid span,
+.blast-grid small {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.agent-stepper {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.agent-stepper span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  padding: 5px 9px;
+  text-transform: capitalize;
+}
+.agent-stepper span.done {
+  border-color: var(--healthy);
+  color: var(--healthy);
+}
+.agent-stepper strong {
+  color: var(--accent);
+  margin-left: auto;
+}
 
 .timeline, .clean-list { list-style: none; margin: 0; padding: 0; }
 .timeline li, .clean-list li { color: var(--text-secondary); margin-top: 10px; }
@@ -426,6 +522,7 @@ h2 { font-size: 1.1rem; }
   .sidebar { min-height: auto; width: 100%; }
   .sidebar-nav { display: grid; grid-template-columns: repeat(3, 1fr); }
   .page-head, .topbar, .query-row { align-items: stretch; flex-direction: column; }
-  .form-grid, .metric-grid, .stats-grid, .service-grid, .insight-grid, .choice-grid { grid-template-columns: 1fr; }
+  .form-grid, .metric-grid, .stats-grid, .service-grid, .insight-grid, .choice-grid, .status-grid, .blast-grid { grid-template-columns: 1fr; }
   .table-row { grid-template-columns: 1fr; }
+  .agent-stepper strong { margin-left: 0; width: 100%; }
 }

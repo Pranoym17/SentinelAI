@@ -70,6 +70,7 @@ class IncidentOrchestrator:
                         "signal_value": signal.value,
                         "affected_services": correlation["affected_services"],
                         "evidence": correlation["evidence"],
+                        "correlation_group": correlation.get("correlation_group"),
                     },
                 )
                 self.db.commit()
@@ -92,6 +93,8 @@ class IncidentOrchestrator:
             hypothesis=investigation.hypothesis,
             confidence=investigation.confidence,
             reasoning_chain=[step.model_dump() for step in investigation.reasoning_chain],
+            recommended_actions=investigation.recommended_actions,
+            raw_model_response=investigation.raw_model_response,
             affected_teams=investigation.affected_teams,
             matched_past_incident_id=matched_incident_id,
         )

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models import Incident, IntegrationConfig
 from app.schemas import IntegrationConfigIn
 from app.services.jira_service import JiraService
+from app.services.github_service import GitHubService
 from app.services.slack_service import SlackService
 from app.services.openai_service import OpenAIService
 from app.time_utils import utc_now
@@ -34,6 +35,9 @@ class IntegrationService:
             "slack": {
                 "configured": slack.configured,
                 "channel": slack.channel,
+            },
+            "github": {
+                "configured": GitHubService(self.db, configs.get("github")).configured,
             },
         }
 
@@ -69,7 +73,17 @@ class IntegrationService:
             "enabled": integration.enabled,
             "connected_at": integration.connected_at.isoformat() if integration.connected_at else None,
             "last_used_at": integration.last_used_at.isoformat() if integration.last_used_at else None,
+            "config": self._masked_config(integration.config or {}),
         }
+
+    def _masked_config(self, config: dict) -> dict:
+        masked = {}
+        for key, value in config.items():
+            if any(secret in key.lower() for secret in ["token", "key", "password", "secret"]):
+                masked[key] = ""
+            else:
+                masked[key] = value
+        return masked
 
     def test_slack(self) -> dict:
         incident = Incident(
@@ -114,3 +128,14 @@ class IntegrationService:
             )
             config = integration.config if integration else {}
         return JiraService(config).create_ticket(incident)
+
+    def test_github(self) -> dict:
+        config = {}
+        if self.db:
+            integration = (
+                self.db.query(IntegrationConfig)
+                .filter(IntegrationConfig.integration_type == "github", IntegrationConfig.enabled.is_(True))
+                .first()
+            )
+            config = integration.config if integration else {}
+        return GitHubService(self.db, config).smoke_test()

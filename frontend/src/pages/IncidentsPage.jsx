@@ -7,9 +7,17 @@ export default function IncidentsPage() {
   const navigate = useNavigate();
   const [incidents, setIncidents] = useState({ active: [], resolved: [] });
   const [filter, setFilter] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    api.getIncidents().then(setIncidents).catch(() => setIncidents({ active: [], resolved: [] }));
+    api.getIncidents()
+      .then(setIncidents)
+      .catch((err) => {
+        setError(err.message);
+        setIncidents({ active: [], resolved: [] });
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const rows = [...(incidents.active || []), ...(incidents.resolved || [])].filter((incident) =>
@@ -29,8 +37,11 @@ export default function IncidentsPage() {
           <option value="resolved">Resolved</option>
         </select>
       </div>
+      {error && <div className="notice">{error}</div>}
       <Card>
-        {rows.length === 0 ? (
+        {loading ? (
+          <EmptyState title="Loading incidents" copy="Fetching active and resolved incidents." />
+        ) : rows.length === 0 ? (
           <EmptyState title="No incidents yet" copy="Trigger the demo from the dashboard to populate this table." />
         ) : (
           <div className="data-table">
