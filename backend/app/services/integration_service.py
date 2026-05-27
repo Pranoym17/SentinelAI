@@ -1,10 +1,17 @@
-from app.models import Incident
+from sqlalchemy.orm import Session
+
+from app.models import Incident, IntegrationConfig
+from app.schemas import IntegrationConfigIn
 from app.services.jira_service import JiraService
 from app.services.slack_service import SlackService
 from app.services.openai_service import OpenAIService
+from app.time_utils import utc_now
 
 
 class IntegrationService:
+    def __init__(self, db: Session | None = None):
+        self.db = db
+
     def status(self) -> dict:
         jira = JiraService()
         slack = SlackService()
@@ -24,6 +31,40 @@ class IntegrationService:
                 "configured": slack.configured,
                 "channel": slack.channel,
             },
+        }
+
+    def list_configs(self) -> dict:
+        if not self.db:
+            return {"integrations": []}
+        integrations = self.db.query(IntegrationConfig).order_by(IntegrationConfig.integration_type).all()
+        return {"integrations": [self.serialize_config(integration) for integration in integrations]}
+
+    def save_config(self, payload: IntegrationConfigIn) -> dict:
+        if not self.db:
+            raise RuntimeError("Database session required")
+        integration = (
+            self.db.query(IntegrationConfig)
+            .filter(IntegrationConfig.integration_type == payload.type)
+            .first()
+        )
+        if not integration:
+            integration = IntegrationConfig(integration_type=payload.type)
+            self.db.add(integration)
+
+        integration.enabled = payload.enabled
+        integration.config = payload.config
+        integration.connected_at = utc_now()
+        self.db.commit()
+        self.db.refresh(integration)
+        return {"status": "saved", "integration": self.serialize_config(integration)}
+
+    def serialize_config(self, integration: IntegrationConfig) -> dict:
+        return {
+            "id": integration.id,
+            "type": integration.integration_type,
+            "enabled": integration.enabled,
+            "connected_at": integration.connected_at.isoformat() if integration.connected_at else None,
+            "last_used_at": integration.last_used_at.isoformat() if integration.last_used_at else None,
         }
 
     def test_slack(self) -> dict:
