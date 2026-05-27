@@ -40,6 +40,10 @@ class DeploySeedIn(BaseModel):
     changes_summary: str = ""
 
 
+class DeployIn(DeploySeedIn):
+    pass
+
+
 class DeploySeedRequest(BaseModel):
     deploys: list[DeploySeedIn]
 

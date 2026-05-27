@@ -27,3 +27,8 @@ def trigger(delay_seconds: int = 30) -> dict:
 @router.get("/worker")
 def state() -> dict:
     return worker.state()
+
+
+@router.get("/state")
+def demo_state(db: Session = Depends(get_db)) -> dict:
+    return DemoService(db).state()

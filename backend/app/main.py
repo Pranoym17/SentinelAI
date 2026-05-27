@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
 from app import models  # noqa: F401
-from app.routers import config, demo, incidents, integrations, metrics, seed
+from app.routers import config, demo, deploys, incidents, integrations, metrics, seed
 
 
 Base.metadata.create_all(bind=engine)
@@ -39,6 +39,7 @@ def health() -> dict[str, str]:
 
 app.include_router(config.router)
 app.include_router(metrics.router)
+app.include_router(deploys.router)
 app.include_router(seed.router)
 app.include_router(demo.router)
 app.include_router(incidents.router)

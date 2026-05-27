@@ -3,6 +3,10 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.models import Config, HealthCheck, HistoricalIncident, Incident, MetricSnapshot, RecentDeploy, TimelineEvent
+from app.services.deploy_service import DeployService
+from app.services.integration_service import IntegrationService
+from app.services.metrics_service import MetricsService
+from app.services.serializers import serialize_incident, serialize_timeline
 from app.time_utils import utc_now
 
 
@@ -63,3 +67,33 @@ class DemoService:
         )
         self.db.commit()
         return {"status": "seeded", "config_id": config.id}
+
+    def state(self) -> dict:
+        from app.background_worker import worker
+
+        active_incident = (
+            self.db.query(Incident)
+            .filter(Incident.status == "open")
+            .order_by(Incident.detected_at.desc())
+            .first()
+        )
+        timeline_events = []
+        if active_incident:
+            timeline_events = (
+                self.db.query(TimelineEvent)
+                .filter(TimelineEvent.incident_id == active_incident.id)
+                .order_by(TimelineEvent.occurred_at)
+                .all()
+            )
+        else:
+            timeline_events = self.db.query(TimelineEvent).order_by(TimelineEvent.occurred_at.desc()).limit(10).all()
+            timeline_events = list(reversed(timeline_events))
+
+        return {
+            "worker": worker.state(),
+            "metrics": MetricsService(self.db).latest()["metrics"],
+            "active_incident": serialize_incident(active_incident, timeline_events) if active_incident else None,
+            "recent_deploys": DeployService(self.db).list(limit=10)["deploys"],
+            "integrations": IntegrationService().status(),
+            "timeline": [serialize_timeline(event) for event in timeline_events],
+        }
