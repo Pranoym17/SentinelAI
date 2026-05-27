@@ -71,6 +71,7 @@ def test_config_metrics_and_signal_flow(client):
         "CHECKING HEALTH",
         "HYPOTHESIS",
     ]
+    assert "slack_skipped" in [event["event_type"] for event in incident["timeline"]]
 
 
 def test_below_threshold_signal_does_not_create_incident(client):

@@ -80,7 +80,7 @@ class IncidentOrchestrator:
         self.db.commit()
         self.db.refresh(incident)
 
-        actions_taken = ResponseAgent(self.db, config).route(incident)
+        actions_taken = ResponseAgent(self.db, config).route(incident, investigation.recommended_actions)
         timeline = self.timeline.get(incident.id)
         return {
             **serialize_incident(incident, timeline),

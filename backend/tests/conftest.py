@@ -2,6 +2,11 @@ import os
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_sentinel.db"
 os.environ["SENTINEL_WORKER_ENABLED"] = "false"
+os.environ["JIRA_BASE_URL"] = ""
+os.environ["JIRA_EMAIL"] = ""
+os.environ["JIRA_API_TOKEN"] = ""
+os.environ["SLACK_WEBHOOK_URL"] = ""
+os.environ["OPENAI_API_KEY"] = ""
 
 import pytest
 from fastapi.testclient import TestClient

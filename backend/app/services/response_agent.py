@@ -14,9 +14,10 @@ class ResponseAgent:
         self.slack = SlackService()
         self.timeline = TimelineService(db)
 
-    def route(self, incident: Incident) -> list[str]:
+    def route(self, incident: Incident, recommended_actions: list[str] | None = None) -> list[str]:
         actions_taken = []
         configured_actions = self.config.actions or []
+        recommended_actions = recommended_actions or []
 
         if incident.confidence is None:
             return actions_taken
@@ -34,27 +35,42 @@ class ResponseAgent:
                         {"url": result["url"]},
                     )
                     actions_taken.append("jira_created")
+                elif result.get("failed"):
+                    self.timeline.append(incident.id, "jira_failed", result.get("reason", "Jira failed"))
                 else:
                     self.timeline.append(incident.id, "jira_skipped", result.get("reason", "Jira skipped"))
 
             if "slack" in configured_actions:
-                result = self.slack.post_incident_alert(incident)
+                result = self.slack.post_incident_alert(incident, recommended_actions)
                 if result.get("posted"):
                     incident.slack_message_ts = result.get("ts")
                     self.timeline.append(incident.id, "slack_sent", "Slack incident alert sent")
                     actions_taken.append("slack_sent")
+                elif result.get("failed"):
+                    self.timeline.append(incident.id, "slack_failed", result.get("reason", "Slack post failed"))
                 else:
                     self.timeline.append(incident.id, "slack_skipped", result.get("reason", "Slack skipped"))
 
         elif incident.confidence >= 50:
             if "slack" in configured_actions:
-                result = self.slack.post_review_request(incident)
+                result = self.slack.post_review_request(incident, recommended_actions)
                 if result.get("posted"):
                     self.timeline.append(incident.id, "slack_review_requested", "Slack review request sent")
                     actions_taken.append("slack_review_requested")
+                elif result.get("failed"):
+                    self.timeline.append(incident.id, "slack_failed", result.get("reason", "Slack post failed"))
                 else:
                     self.timeline.append(incident.id, "slack_skipped", result.get("reason", "Slack skipped"))
         else:
+            if "slack" in configured_actions:
+                result = self.slack.post_low_confidence_alert(incident)
+                if result.get("posted"):
+                    self.timeline.append(incident.id, "slack_low_confidence_sent", "Slack low-confidence alert sent")
+                    actions_taken.append("slack_low_confidence_sent")
+                elif result.get("failed"):
+                    self.timeline.append(incident.id, "slack_failed", result.get("reason", "Slack post failed"))
+                else:
+                    self.timeline.append(incident.id, "slack_skipped", result.get("reason", "Slack skipped"))
             self.timeline.append(incident.id, "human_review", "Low-confidence incident flagged for human review")
             actions_taken.append("flagged_for_review")
 
