@@ -7,6 +7,7 @@ from app.schemas import SignalIn
 from app.services.metrics_service import MetricsService
 from app.services.response_agent import ResponseAgent
 from app.services.serializers import serialize_incident
+from app.services.sla_service import SLAService
 from app.services.timeline_service import TimelineService
 
 
@@ -77,6 +78,8 @@ class IncidentOrchestrator:
             f"Hypothesis formed with {investigation.confidence}% confidence",
             {"recommended_actions": investigation.recommended_actions},
         )
+
+        sla_prediction = self._apply_sla_prediction(incident, investigation.recommended_actions)
         self.db.commit()
         self.db.refresh(incident)
 
@@ -87,6 +90,7 @@ class IncidentOrchestrator:
             "triggered": True,
             "actions_taken": actions_taken,
             "recommended_actions": investigation.recommended_actions,
+            "sla_prediction": sla_prediction,
         }
 
     def _existing_open_incident(self, signal: SignalIn) -> Incident | None:
@@ -100,3 +104,31 @@ class IncidentOrchestrator:
             .order_by(Incident.detected_at.desc())
             .first()
         )
+
+    def _apply_sla_prediction(self, incident: Incident, recommended_actions: list[str]) -> dict:
+        prediction = SLAService(self.db).predict_breach(incident.service)
+
+        if prediction["will_breach"]:
+            sla_action = f"SLA warning: {prediction['message']}"
+            if sla_action not in recommended_actions:
+                recommended_actions.insert(0, sla_action)
+            self.timeline.append(
+                incident.id,
+                "sla_warning",
+                prediction["message"],
+                {
+                    "breach_in_minutes": prediction["breach_in_minutes"],
+                    "service": incident.service,
+                },
+            )
+            if prediction["breach_in_minutes"] < 30 and incident.severity != "SEV-1":
+                previous_severity = incident.severity
+                incident.severity = "SEV-1"
+                self.timeline.append(
+                    incident.id,
+                    "severity_escalated",
+                    f"Severity escalated from {previous_severity} to SEV-1 due to SLA risk",
+                    {"reason": "sla_breach_risk", "previous_severity": previous_severity},
+                )
+
+        return prediction

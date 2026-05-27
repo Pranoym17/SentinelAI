@@ -7,6 +7,7 @@ from app.agents.post_mortem_agent import PostMortemAgent
 from app.agents.status_agent import StatusAgent
 from app.services.memory_service import MemoryService
 from app.services.serializers import serialize_incident
+from app.services.sla_service import SLAService
 from app.services.timeline_service import TimelineService
 from app.time_utils import utc_now
 
@@ -66,6 +67,23 @@ class IncidentService:
             resolution=payload.resolution_text,
             duration_minutes=incident.duration_minutes or 0,
             occurred_at=incident.detected_at,
+        )
+        sla_record = SLAService(self.db).record_downtime(
+            incident.service,
+            incident.duration_minutes or 0,
+            commit=False,
+        )
+        self.timeline.append(
+            incident.id,
+            "sla_downtime_recorded",
+            f"Recorded {incident.duration_minutes or 0} minute(s) of downtime against {incident.service} SLA",
+            {
+                "service": incident.service,
+                "month": sla_record.month,
+                "total_downtime_minutes": sla_record.total_downtime_minutes,
+                "incident_count": sla_record.incident_count,
+                "sla_breached": sla_record.sla_breached,
+            },
         )
         self.db.commit()
         self.db.refresh(incident)

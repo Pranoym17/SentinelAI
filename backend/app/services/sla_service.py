@@ -65,7 +65,7 @@ class SLAService:
             ),
         }
 
-    def record_downtime(self, service_name: str, duration_minutes: int) -> SLARecord:
+    def record_downtime(self, service_name: str, duration_minutes: int, commit: bool = True) -> SLARecord:
         now = utc_now()
         month_key = now.strftime("%Y-%m")
         record = (
@@ -91,6 +91,7 @@ class SLAService:
         actual = ((total_minutes - record.total_downtime_minutes) / total_minutes) * 100
         record.actual_uptime = round(actual, 4)
         record.sla_breached = actual < record.target_uptime
-        self.db.commit()
-        self.db.refresh(record)
+        if commit:
+            self.db.commit()
+            self.db.refresh(record)
         return record
