@@ -4,6 +4,7 @@ from app.agents.detection_agent import DetectionAgent
 from app.agents.investigator_agent import InvestigatorAgent
 from app.models import Config, Incident
 from app.schemas import SignalIn
+from app.services.correlation_service import CorrelationService
 from app.services.metrics_service import MetricsService
 from app.services.response_agent import ResponseAgent
 from app.services.serializers import serialize_incident
@@ -50,6 +51,37 @@ class IncidentOrchestrator:
                 "actions_taken": [],
                 "recommended_actions": [],
             }
+
+        correlation = CorrelationService(self.db).find(signal)
+        if correlation["correlated"]:
+            primary = self.db.get(Incident, correlation["primary_incident_id"])
+            if primary:
+                primary.hypothesis = f"{primary.hypothesis or 'Incident correlated.'} Correlation: {correlation['root_cause']}."
+                self.timeline.append(
+                    primary.id,
+                    "correlation_detected",
+                    (
+                        f"{signal.service} {signal.type} correlated with incident #{primary.id}: "
+                        f"{correlation['root_cause']}"
+                    ),
+                    {
+                        "signal_service": signal.service,
+                        "signal_type": signal.type,
+                        "signal_value": signal.value,
+                        "affected_services": correlation["affected_services"],
+                        "evidence": correlation["evidence"],
+                    },
+                )
+                self.db.commit()
+                self.db.refresh(primary)
+                return {
+                    **serialize_incident(primary, self.timeline.get(primary.id)),
+                    "triggered": True,
+                    "correlated": True,
+                    "correlation": correlation,
+                    "actions_taken": [],
+                    "recommended_actions": ["Treat as correlated incident", correlation["root_cause"]],
+                }
 
         investigation, matched_incident_id = self.investigator.investigate(signal)
         incident = Incident(

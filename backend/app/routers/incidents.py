@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas import ResolveIncidentIn, RollbackIn, SignalIn, StatusQueryIn
 from app.services.incident_service import IncidentService
+from app.services.blast_radius_service import BlastRadiusService
 from app.services.rollback_service import RollbackService
 
 
@@ -75,6 +76,26 @@ def rollback_incident(
         raise HTTPException(status_code=400, detail="Only open incidents can be rolled back")
     rollback_payload = payload or RollbackIn()
     return RollbackService(db).execute(incident, delay_seconds=rollback_payload.delay_seconds)
+
+
+@router.post("/api/incidents/{incident_id}/blast-radius")
+def analyze_blast_radius(incident_id: int, db: Session = Depends(get_db)) -> dict:
+    service = IncidentService(db)
+    incident = service.get(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    result = BlastRadiusService(db).analyze_incident(incident)
+    service.timeline.append(
+        incident.id,
+        "blast_radius_analyzed",
+        result["warning"] or f"No connected services found for {incident.service}.",
+        {
+            "affected_services": result["affected_services"],
+            "risk_level": result["risk_level"],
+        },
+    )
+    db.commit()
+    return result
 
 
 @router.post("/api/status")
