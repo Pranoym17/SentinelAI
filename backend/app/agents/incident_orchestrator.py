@@ -5,6 +5,7 @@ from app.agents.investigator_agent import InvestigatorAgent
 from app.models import Config, Incident
 from app.schemas import SignalIn
 from app.services.correlation_service import CorrelationService
+from app.services.commander_service import CommanderService
 from app.services.metrics_service import MetricsService
 from app.services.response_agent import ResponseAgent
 from app.services.serializers import serialize_incident
@@ -19,6 +20,7 @@ class IncidentOrchestrator:
         self.investigator = InvestigatorAgent(db)
         self.metrics = MetricsService(db)
         self.timeline = TimelineService(db)
+        self.commander = CommanderService(db)
 
     def handle_signal(self, signal: SignalIn, config: Config) -> dict:
         self.metrics.record_signal(signal.service, signal.type, signal.value, signal.baseline)
@@ -101,11 +103,28 @@ class IncidentOrchestrator:
         self.db.add(incident)
         self.db.flush()
 
+        self.commander.started(
+            incident.id,
+            "DetectionAgent",
+            f"Processing {signal.type} for {signal.service}",
+            {"service": signal.service, "signal_type": signal.type},
+        )
         self.timeline.append(
             incident.id,
             "detection",
             f"{signal.type} detected for {signal.service}: {signal.value}",
             {"baseline": signal.baseline, "unit": signal.unit},
+        )
+        self.commander.completed(
+            incident.id,
+            "DetectionAgent",
+            "Anomaly promoted to incident",
+            {"signal_value": signal.value, "baseline": signal.baseline},
+        )
+        self.commander.started(
+            incident.id,
+            "InvestigatorAgent",
+            "Evaluating memory, deploys, health checks, runbooks, and GitHub commits",
         )
         self.timeline.append(
             incident.id,
@@ -113,12 +132,31 @@ class IncidentOrchestrator:
             f"Hypothesis formed with {investigation.confidence}% confidence",
             {"recommended_actions": investigation.recommended_actions},
         )
+        self.commander.completed(
+            incident.id,
+            "InvestigatorAgent",
+            f"Hypothesis formed with {investigation.confidence}% confidence",
+            {"severity": investigation.severity, "affected_teams": investigation.affected_teams},
+        )
 
         sla_prediction = self._apply_sla_prediction(incident, investigation.recommended_actions)
         self.db.commit()
         self.db.refresh(incident)
 
+        self.commander.started(
+            incident.id,
+            "ResponseAgent",
+            "Routing incident through Jira, Slack, and human-review policy",
+            {"confidence": incident.confidence},
+        )
         actions_taken = ResponseAgent(self.db, config).route(incident, investigation.recommended_actions)
+        self.commander.completed(
+            incident.id,
+            "ResponseAgent",
+            f"Response routing completed with actions: {', '.join(actions_taken) or 'none'}",
+            {"actions_taken": actions_taken},
+        )
+        self.db.commit()
         timeline = self.timeline.get(incident.id)
         return {
             **serialize_incident(incident, timeline),

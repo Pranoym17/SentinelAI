@@ -38,11 +38,20 @@ def test_response_agent_records_jira_and_slack_success(client):
             return_value={"created": True, "ticket_id": "SCRUM-9", "url": "https://example/browse/SCRUM-9"}
         )
         agent.slack.post_incident_alert = Mock(return_value={"posted": True, "ts": "123.456"})
+        agent.slack.post_thread_update = Mock(return_value={"posted": True, "ts": "123.789"})
 
         actions = agent.route(incident, ["Rollback"])
 
         assert actions == ["jira_created", "slack_sent"]
-        assert event_types(db, incident.id) == ["jira_created", "slack_sent"]
+        assert event_types(db, incident.id) == [
+            "communication_briefs_generated",
+            "jira_created",
+            "slack_sent",
+            "slack_thread_updated",
+        ]
+        payload = agent.slack.post_incident_alert.call_args.kwargs
+        assert "engineer_brief" in payload["briefs"]
+        assert "manager_brief" in payload["briefs"]
     finally:
         db.close()
 
@@ -60,7 +69,7 @@ def test_response_agent_records_failures(client):
         actions = agent.route(incident, ["Rollback"])
 
         assert actions == []
-        assert event_types(db, incident.id) == ["jira_failed", "slack_failed"]
+        assert event_types(db, incident.id) == ["communication_briefs_generated", "jira_failed", "slack_failed"]
     finally:
         db.close()
 
@@ -78,7 +87,7 @@ def test_response_agent_records_skips(client):
         actions = agent.route(incident, ["Rollback"])
 
         assert actions == []
-        assert event_types(db, incident.id) == ["jira_skipped", "slack_skipped"]
+        assert event_types(db, incident.id) == ["communication_briefs_generated", "jira_skipped", "slack_skipped"]
     finally:
         db.close()
 
@@ -95,6 +104,10 @@ def test_response_agent_low_confidence_slack_path(client):
         actions = agent.route(incident)
 
         assert actions == ["slack_low_confidence_sent", "flagged_for_review"]
-        assert event_types(db, incident.id) == ["slack_low_confidence_sent", "human_review"]
+        assert event_types(db, incident.id) == [
+            "communication_briefs_generated",
+            "slack_low_confidence_sent",
+            "human_review",
+        ]
     finally:
         db.close()

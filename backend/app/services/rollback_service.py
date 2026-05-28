@@ -3,6 +3,7 @@ import time
 from sqlalchemy.orm import Session
 
 from app.models import Config, Incident, MetricSnapshot
+from app.services.commander_service import CommanderService
 from app.services.response_agent import ResponseAgent
 from app.services.timeline_service import TimelineService
 
@@ -22,6 +23,7 @@ class RollbackService:
     def __init__(self, db: Session):
         self.db = db
         self.timeline = TimelineService(db)
+        self.commander = CommanderService(db)
 
     def execute(self, incident: Incident, delay_seconds: float = 0.0) -> dict:
         logs = []
@@ -29,6 +31,12 @@ class RollbackService:
             incident.id,
             "rollback_started",
             f"Rollback started for {incident.service}",
+            {"target_version": "v2.4.0"},
+        )
+        self.commander.started(
+            incident.id,
+            "RollbackAgent",
+            f"Executing rollback for {incident.service}",
             {"target_version": "v2.4.0"},
         )
         self._sync_update(incident, "rollback_started", f"Rollback started for {incident.service}")
@@ -62,6 +70,12 @@ class RollbackService:
             incident.id,
             "rollback_completed",
             f"Rollback completed for {incident.service}",
+        )
+        self.commander.completed(
+            incident.id,
+            "RollbackAgent",
+            f"Rollback completed for {incident.service}",
+            {"metric_type": "error_rate", "value": 0.2},
         )
         self._sync_update(incident, "rollback_completed", f"Rollback completed for {incident.service}")
         self.db.commit()

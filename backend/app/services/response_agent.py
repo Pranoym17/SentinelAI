@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models import Config, Incident
 from app.services.integration_config_resolver import IntegrationConfigResolver
 from app.services.jira_service import JiraService
+from app.services.commander_service import CommanderService
 from app.services.oncall_service import OnCallService
 from app.services.slack_service import SlackService
 from app.services.timeline_service import TimelineService
@@ -17,6 +18,7 @@ class ResponseAgent:
         self.slack = SlackService(integration_configs.config_for("slack"))
         self.timeline = TimelineService(db)
         self.oncall = OnCallService(db)
+        self.commander = CommanderService(db)
 
     def route(self, incident: Incident, recommended_actions: list[str] | None = None) -> list[str]:
         actions_taken = []
@@ -25,6 +27,10 @@ class ResponseAgent:
 
         if incident.confidence is None:
             return actions_taken
+
+        timeline = self.timeline.get(incident.id)
+        briefs = self.commander.communication_briefs(incident, timeline)
+        self.commander.append_briefs(incident, briefs)
 
         if incident.confidence >= 80:
             current_oncall = self._identify_oncall(incident)
@@ -40,14 +46,18 @@ class ResponseAgent:
                         {"url": result["url"]},
                     )
                     actions_taken.append("jira_created")
-                    self._enhance_jira_incident(incident, recommended_actions, current_oncall, actions_taken)
+                    self._enhance_jira_incident(incident, recommended_actions, current_oncall, briefs, actions_taken)
                 elif result.get("failed"):
                     self.timeline.append(incident.id, "jira_failed", result.get("reason", "Jira failed"))
                 else:
                     self.timeline.append(incident.id, "jira_skipped", result.get("reason", "Jira skipped"))
 
             if "slack" in configured_actions:
-                result = self.slack.post_incident_alert(incident, self._slack_actions(incident, recommended_actions))
+                result = self.slack.post_incident_alert(
+                    incident,
+                    self._slack_actions(incident, recommended_actions),
+                    briefs=briefs,
+                )
                 if result.get("posted"):
                     incident.slack_message_ts = result.get("ts")
                     self.timeline.append(incident.id, "slack_sent", "Slack incident alert sent")
@@ -65,7 +75,12 @@ class ResponseAgent:
         elif incident.confidence >= 50:
             if "slack" in configured_actions:
                 current_oncall = self._identify_oncall(incident)
-                result = self.slack.post_review_request(incident, self._slack_actions(incident, recommended_actions), current_oncall)
+                result = self.slack.post_review_request(
+                    incident,
+                    self._slack_actions(incident, recommended_actions),
+                    current_oncall,
+                    briefs=briefs,
+                )
                 if result.get("posted"):
                     incident.slack_message_ts = result.get("ts")
                     self.timeline.append(incident.id, "slack_review_requested", "Slack review request sent")
@@ -77,7 +92,7 @@ class ResponseAgent:
         else:
             current_oncall = self._identify_oncall(incident)
             if "slack" in configured_actions:
-                result = self.slack.post_low_confidence_alert(incident, current_oncall)
+                result = self.slack.post_low_confidence_alert(incident, current_oncall, briefs=briefs)
                 if result.get("posted"):
                     incident.slack_message_ts = result.get("ts")
                     self.timeline.append(incident.id, "slack_low_confidence_sent", "Slack low-confidence alert sent")
@@ -155,6 +170,7 @@ class ResponseAgent:
         incident: Incident,
         recommended_actions: list[str],
         current_oncall: dict | None,
+        briefs: dict,
         actions_taken: list[str],
     ) -> None:
         assign = self.jira.assign_issue(incident.jira_ticket_id, current_oncall)
@@ -178,7 +194,7 @@ class ResponseAgent:
             )
             actions_taken.append("jira_subtasks_created")
 
-        comment = self.jira.add_comment(incident.jira_ticket_id, self._initial_jira_comment(incident, current_oncall))
+        comment = self.jira.add_comment(incident.jira_ticket_id, self._initial_jira_comment(incident, current_oncall, briefs))
         if comment.get("commented"):
             self.timeline.append(incident.id, "jira_comment_added", "Initial incident context added to Jira", comment)
 
@@ -237,7 +253,7 @@ class ResponseAgent:
             ),
         }
 
-    def _initial_jira_comment(self, incident: Incident, current_oncall: dict | None) -> str:
+    def _initial_jira_comment(self, incident: Incident, current_oncall: dict | None, briefs: dict) -> str:
         oncall = current_oncall.get("name") if current_oncall else "No on-call engineer matched"
         actions = "\n".join(f"- {action}" for action in (incident.recommended_actions or [])) or "- No recommended actions captured"
         return (
@@ -245,6 +261,8 @@ class ResponseAgent:
             f"Owner: {oncall}\n"
             f"Confidence: {incident.confidence}%\n"
             f"Hypothesis: {incident.hypothesis or 'No hypothesis captured'}\n\n"
+            f"Engineer brief: {briefs.get('engineer_brief', 'Unavailable')}\n"
+            f"Manager brief: {briefs.get('manager_brief', 'Unavailable')}\n\n"
             f"Recommended actions:\n{actions}"
         )
 

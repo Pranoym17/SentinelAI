@@ -6,6 +6,7 @@ from app.agents.incident_orchestrator import IncidentOrchestrator
 from app.agents.post_mortem_agent import PostMortemAgent
 from app.agents.status_agent import StatusAgent
 from app.services.memory_service import MemoryService
+from app.services.commander_service import CommanderService
 from app.services.response_agent import ResponseAgent
 from app.services.serializers import serialize_incident
 from app.services.runbook_service import RunbookService
@@ -28,6 +29,7 @@ class IncidentService:
         self.timeline = TimelineService(db)
         self.memory = MemoryService(db)
         self.runbooks = RunbookService(db)
+        self.commander = CommanderService(db)
 
     def latest_config(self) -> Config | None:
         return self.db.query(Config).order_by(Config.id.desc()).first()
@@ -62,7 +64,18 @@ class IncidentService:
             f"Incident resolved: {payload.resolution_text}",
         )
         timeline = self.timeline.get(incident.id)
+        self.commander.started(
+            incident.id,
+            "PostMortemAgent",
+            "Generating post-mortem from timeline, reasoning, and resolution",
+        )
         incident.post_mortem = PostMortemAgent().generate(incident, timeline)
+        self.commander.completed(
+            incident.id,
+            "PostMortemAgent",
+            "Post-mortem generated",
+            {"duration_minutes": incident.duration_minutes},
+        )
         self.memory.remember(
             service=incident.service,
             signal_type=incident.signal_type,

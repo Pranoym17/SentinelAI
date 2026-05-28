@@ -24,6 +24,7 @@ def make_incident(confidence=95):
 
 def test_missing_webhook_skips(monkeypatch):
     monkeypatch.delenv("SLACK_WEBHOOK_URL", raising=False)
+    monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
 
     result = SlackService().post_incident_alert(make_incident())
 

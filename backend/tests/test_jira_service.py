@@ -132,7 +132,7 @@ def test_jira_creates_subtasks_from_actions(monkeypatch):
     assert [item["ticket_id"] for item in result["subtasks"]] == ["INC-124", "INC-125"]
     payload = post.call_args_list[0].kwargs["json"]
     assert payload["fields"]["parent"]["key"] == "INC-123"
-    assert payload["fields"]["issuetype"]["name"] == "Sub-task"
+    assert payload["fields"]["issuetype"]["name"] == "Subtask"
 
 
 def test_jira_add_comment_and_transition(monkeypatch):

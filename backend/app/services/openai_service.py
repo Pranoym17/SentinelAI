@@ -103,6 +103,46 @@ class OpenAIService:
         )
         return response.choices[0].message.content or ""
 
+    def generate_communication_briefs(self, context: dict) -> dict:
+        if not self.client:
+            raise RuntimeError("OpenAI client is not configured")
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an incident commander. Return JSON only with engineer_brief and manager_brief. "
+                        "Engineer brief is technical and mentions evidence. Manager brief is concise, impact/status oriented, "
+                        "and avoids unnecessary implementation details. Use only provided context."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "context": context,
+                            "schema": {
+                                "engineer_brief": "technical summary for engineers, 1-2 sentences",
+                                "manager_brief": "plain English status for managers, 1-2 sentences",
+                            },
+                        },
+                        indent=2,
+                        default=str,
+                    ),
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            timeout=20,
+        )
+        data = json.loads(response.choices[0].message.content or "{}")
+        return {
+            "engineer_brief": data.get("engineer_brief") or "Engineer brief unavailable.",
+            "manager_brief": data.get("manager_brief") or "Manager brief unavailable.",
+        }
+
     def correlate_incidents(self, context: dict) -> dict:
         if not self.client:
             raise RuntimeError("OpenAI client is not configured")

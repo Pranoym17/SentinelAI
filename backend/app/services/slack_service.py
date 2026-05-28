@@ -28,7 +28,12 @@ class SlackService:
     def configured(self) -> bool:
         return bool(self.webhook_url or (self.bot_token and self.channel))
 
-    def post_incident_alert(self, incident: Incident, recommended_actions: list[str] | None = None) -> dict:
+    def post_incident_alert(
+        self,
+        incident: Incident,
+        recommended_actions: list[str] | None = None,
+        briefs: dict | None = None,
+    ) -> dict:
         if not self.configured:
             return {"posted": False, "reason": "Slack webhook is not configured"}
 
@@ -37,6 +42,7 @@ class SlackService:
             title="Incident response started",
             mode="high_confidence",
             recommended_actions=recommended_actions or [],
+            briefs=briefs,
             footer="High confidence: SentinelAI has started coordinated response actions.",
         )
         return self._post(payload)
@@ -46,6 +52,7 @@ class SlackService:
         incident: Incident,
         recommended_actions: list[str] | None = None,
         oncall: dict | None = None,
+        briefs: dict | None = None,
     ) -> dict:
         if not self.configured:
             return {"posted": False, "reason": "Slack webhook is not configured"}
@@ -56,6 +63,7 @@ class SlackService:
             mode="medium_confidence",
             recommended_actions=recommended_actions or [],
             oncall=oncall,
+            briefs=briefs,
             footer="Medium confidence: SentinelAI is waiting for human confirmation.",
         )
         return self._post(payload)
@@ -84,7 +92,12 @@ class SlackService:
             payload["thread_ts"] = thread_ts
         return self._post(payload)
 
-    def post_low_confidence_alert(self, incident: Incident, oncall: dict | None = None) -> dict:
+    def post_low_confidence_alert(
+        self,
+        incident: Incident,
+        oncall: dict | None = None,
+        briefs: dict | None = None,
+    ) -> dict:
         if not self.configured:
             return {"posted": False, "reason": "Slack webhook is not configured"}
 
@@ -94,6 +107,7 @@ class SlackService:
             mode="low_confidence",
             recommended_actions=["Review telemetry manually", "Check adjacent service health"],
             oncall=oncall,
+            briefs=briefs,
             footer="Low confidence: SentinelAI did not take automated action.",
         )
         return self._post(payload)
@@ -106,6 +120,7 @@ class SlackService:
         recommended_actions: list[str],
         footer: str,
         oncall: dict | None = None,
+        briefs: dict | None = None,
     ) -> dict:
         emoji = SEVERITY_EMOJI.get(incident.severity or "", ":white_circle:")
         teams = ", ".join(incident.affected_teams or []) or "not assigned"
@@ -138,6 +153,20 @@ class SlackService:
                 "text": {"type": "mrkdwn", "text": f"*Recommended actions:*\n{actions_text}"},
             },
         ]
+
+        if briefs:
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            f"*Engineer brief:*\n{briefs.get('engineer_brief', 'Unavailable')}\n\n"
+                            f"*Manager brief:*\n{briefs.get('manager_brief', 'Unavailable')}"
+                        ),
+                    },
+                }
+            )
 
         if incident.jira_ticket_url:
             blocks.append(

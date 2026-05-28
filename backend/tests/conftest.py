@@ -6,7 +6,9 @@ os.environ["JIRA_BASE_URL"] = ""
 os.environ["JIRA_EMAIL"] = ""
 os.environ["JIRA_API_TOKEN"] = ""
 os.environ["SLACK_WEBHOOK_URL"] = ""
+os.environ["SLACK_BOT_TOKEN"] = ""
 os.environ["OPENAI_API_KEY"] = ""
+os.environ["GITHUB_TOKEN"] = ""
 
 import pytest
 from fastapi.testclient import TestClient
