@@ -99,4 +99,12 @@ export const api = {
     request(`/api/incidents/${incidentId}/blast-radius`, {
       method: 'POST',
     }),
+  generateFixPreview: (incidentId) =>
+    request(`/api/incidents/${incidentId}/fix-preview`, {
+      method: 'POST',
+    }),
+  createGithubPr: (incidentId) =>
+    request(`/api/incidents/${incidentId}/github-pr`, {
+      method: 'POST',
+    }),
 };

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 
 import { api } from '../api.js';
+import CommanderStrip from '../components/CommanderStrip.jsx';
 import DeployFeed from '../components/DeployFeed.jsx';
+import FixPreviewPanel from '../components/FixPreviewPanel.jsx';
 import IncidentCommandPanel from '../components/IncidentCommandPanel.jsx';
 import IncidentHistory from '../components/IncidentHistory.jsx';
 import IntegrationStatus from '../components/IntegrationStatus.jsx';
@@ -123,6 +125,7 @@ export default function Dashboard() {
           </span>
         </div>
       </Panel>
+      <CommanderStrip timeline={activeTimeline} />
 
       <section className="stats-row">
         <MetricCell label="System health" value={incident ? '68' : '94'} status={incident ? 'warning' : 'healthy'} />
@@ -146,6 +149,7 @@ export default function Dashboard() {
             onRefresh={refresh}
             onResolved={(markdown) => setPostMortem(markdown)}
           />
+          {incident && <FixPreviewPanel incident={incident} onRefresh={refresh} compact />}
           <PostMortemViewer incident={incident} markdown={postMortem} />
         </section>
       </div>
