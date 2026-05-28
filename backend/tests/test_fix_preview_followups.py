@@ -106,3 +106,32 @@ def test_post_mortem_followups_create_jira_tasks(client):
         jira.create_subtasks.assert_called_once()
     finally:
         db.close()
+
+
+def test_post_mortem_followups_skip_when_jira_unavailable(client):
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        incident = add_incident(db, resolved=True)
+        incident.jira_ticket_id = None
+        db.commit()
+
+        jira = Mock()
+        jira.configured = False
+        jira.create_subtasks.return_value = {
+            "created": False,
+            "reason": "Jira is not configured",
+            "subtasks": [],
+        }
+        service = PostMortemFollowupService(db, jira=jira)
+        service.openai.client = None
+
+        result = service.create_followups(incident)
+
+        assert result["created"] is False
+        assert result["jira"]["reason"] == "Jira is not configured"
+        assert "jira_followups_skipped" in event_types(db, incident.id)
+        assert "jira_followups_failed" not in event_types(db, incident.id)
+    finally:
+        db.close()

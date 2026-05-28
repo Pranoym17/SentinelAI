@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Incident
 from app.services.commander_service import CommanderService
+from app.services.integration_config_resolver import IntegrationConfigResolver
 from app.services.jira_service import JiraService
 from app.services.openai_service import OpenAIService
 from app.services.timeline_service import TimelineService
@@ -13,7 +14,7 @@ class PostMortemFollowupService:
         self.openai = OpenAIService()
         self.timeline = TimelineService(db)
         self.commander = CommanderService(db)
-        self.jira = jira or JiraService()
+        self.jira = jira or JiraService(IntegrationConfigResolver(db).config_for("jira"))
 
     def create_followups(self, incident: Incident) -> dict:
         self.commander.started(
@@ -51,6 +52,20 @@ class PostMortemFollowupService:
                 f"Created {len(created)} prevention follow-up task(s)",
                 {"items": items},
             )
+        elif self._is_non_blocking_skip(result):
+            reason = result.get("reason", "Jira follow-up task creation skipped")
+            self.timeline.append(
+                incident.id,
+                "jira_followups_skipped",
+                reason,
+                {"items": items, "subtasks": result.get("subtasks", [])},
+            )
+            self.commander.completed(
+                incident.id,
+                "PostMortemAgent",
+                f"Prevention tasks generated; Jira follow-up creation skipped: {reason}",
+                {"items": items},
+            )
         else:
             self.timeline.append(
                 incident.id,
@@ -66,6 +81,17 @@ class PostMortemFollowupService:
             )
         self.db.flush()
         return {"created": bool(created), "items": items, "jira": result}
+
+    def _is_non_blocking_skip(self, result: dict) -> bool:
+        if result.get("failed"):
+            return False
+        reason = str(result.get("reason") or "").lower()
+        return (
+            not self.jira.configured
+            or "not configured" in reason
+            or "no jira parent" in reason
+            or "no jira issue" in reason
+        )
 
     def _extract_items(self, incident: Incident) -> list[dict]:
         context = {

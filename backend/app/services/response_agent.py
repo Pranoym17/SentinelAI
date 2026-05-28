@@ -31,27 +31,28 @@ class ResponseAgent:
         timeline = self.timeline.get(incident.id)
         briefs = self.commander.communication_briefs(incident, timeline)
         self.commander.append_briefs(incident, briefs)
+        current_oncall = self._identify_oncall(incident)
+
+        if "jira" in configured_actions:
+            result = self.jira.create_ticket(incident)
+            if result.get("created"):
+                incident.jira_ticket_id = result["ticket_id"]
+                incident.jira_ticket_url = result["url"]
+                self.timeline.append(
+                    incident.id,
+                    "jira_created",
+                    f"Jira ticket {result['ticket_id']} created",
+                    {"url": result["url"]},
+                )
+                actions_taken.append("jira_created")
+                if incident.confidence >= 80:
+                    self._enhance_jira_incident(incident, recommended_actions, current_oncall, briefs, actions_taken)
+            elif result.get("failed"):
+                self.timeline.append(incident.id, "jira_failed", result.get("reason", "Jira failed"))
+            else:
+                self.timeline.append(incident.id, "jira_skipped", result.get("reason", "Jira skipped"))
 
         if incident.confidence >= 80:
-            current_oncall = self._identify_oncall(incident)
-            if "jira" in configured_actions:
-                result = self.jira.create_ticket(incident)
-                if result.get("created"):
-                    incident.jira_ticket_id = result["ticket_id"]
-                    incident.jira_ticket_url = result["url"]
-                    self.timeline.append(
-                        incident.id,
-                        "jira_created",
-                        f"Jira ticket {result['ticket_id']} created",
-                        {"url": result["url"]},
-                    )
-                    actions_taken.append("jira_created")
-                    self._enhance_jira_incident(incident, recommended_actions, current_oncall, briefs, actions_taken)
-                elif result.get("failed"):
-                    self.timeline.append(incident.id, "jira_failed", result.get("reason", "Jira failed"))
-                else:
-                    self.timeline.append(incident.id, "jira_skipped", result.get("reason", "Jira skipped"))
-
             if "slack" in configured_actions:
                 result = self.slack.post_incident_alert(
                     incident,
@@ -74,7 +75,6 @@ class ResponseAgent:
 
         elif incident.confidence >= 50:
             if "slack" in configured_actions:
-                current_oncall = self._identify_oncall(incident)
                 result = self.slack.post_review_request(
                     incident,
                     self._slack_actions(incident, recommended_actions),
@@ -90,7 +90,6 @@ class ResponseAgent:
                 else:
                     self.timeline.append(incident.id, "slack_skipped", result.get("reason", "Slack skipped"))
         else:
-            current_oncall = self._identify_oncall(incident)
             if "slack" in configured_actions:
                 result = self.slack.post_low_confidence_alert(incident, current_oncall, briefs=briefs)
                 if result.get("posted"):

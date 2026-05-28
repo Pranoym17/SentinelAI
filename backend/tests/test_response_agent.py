@@ -111,3 +111,27 @@ def test_response_agent_low_confidence_slack_path(client):
         ]
     finally:
         db.close()
+
+
+def test_response_agent_creates_jira_for_low_confidence_incident(client):
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        incident = add_incident(db, confidence=9)
+        agent = ResponseAgent(db, Config(actions=["jira"]))
+        agent.jira.create_ticket = Mock(
+            return_value={"created": True, "ticket_id": "SCRUM-11", "url": "https://example/browse/SCRUM-11"}
+        )
+
+        actions = agent.route(incident)
+
+        assert actions == ["jira_created", "flagged_for_review"]
+        assert incident.jira_ticket_id == "SCRUM-11"
+        assert event_types(db, incident.id) == [
+            "communication_briefs_generated",
+            "jira_created",
+            "human_review",
+        ]
+    finally:
+        db.close()
