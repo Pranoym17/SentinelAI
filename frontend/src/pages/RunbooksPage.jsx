@@ -75,7 +75,7 @@ export default function RunbooksPage() {
             <ol className="steps-list">
               {(runbook.steps || []).map((step) => <li key={step}>{step}</li>)}
             </ol>
-            <div className="mini-stats">
+            <div className="runbook-stat-pills">
               <span>{runbook.times_used} uses</span>
               <span>{runbook.success_rate}% success</span>
             </div>
@@ -85,12 +85,24 @@ export default function RunbooksPage() {
       <Panel>
         <SectionHeader title="Create runbook" />
         <div className="form-grid">
-          <input value={draft.service} onChange={(event) => setDraft({ ...draft, service: event.target.value })} />
-          <input value={draft.signal_type} onChange={(event) => setDraft({ ...draft, signal_type: event.target.value })} />
-          <input placeholder="title" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
-          <textarea placeholder="one step per line" value={draft.steps} onChange={(event) => setDraft({ ...draft, steps: event.target.value })} />
+          <label className="field">
+            <span>Service</span>
+            <input value={draft.service} onChange={(event) => setDraft({ ...draft, service: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Signal type</span>
+            <input value={draft.signal_type} onChange={(event) => setDraft({ ...draft, signal_type: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Title</span>
+            <input placeholder="title" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Steps</span>
+            <textarea placeholder="one step per line" value={draft.steps} onChange={(event) => setDraft({ ...draft, steps: event.target.value })} />
+          </label>
         </div>
-        <Button disabled={busy || !draft.title.trim()} onClick={create}>
+        <Button variant="primary" disabled={busy || !draft.title.trim()} onClick={create}>
           {busy ? 'Creating...' : 'Create runbook'}
         </Button>
       </Panel>

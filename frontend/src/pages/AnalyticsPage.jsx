@@ -39,7 +39,16 @@ export default function AnalyticsPage() {
       </div>
       <Panel>
         <SectionHeader title="Incidents by service" />
-        {chartData.length === 0 ? <EmptyState title="◎ Not enough data yet" copy="Analytics populate after your first resolved incident. The agent is monitoring. Check back soon." /> : <div className="chart-wrap small">
+        {chartData.length === 0 ? <div className="analytics-placeholder">
+          <div className="skeleton-chart" aria-hidden="true">
+            <span style={{ height: '38%' }} />
+            <span style={{ height: '64%' }} />
+            <span style={{ height: '46%' }} />
+            <span style={{ height: '78%' }} />
+            <span style={{ height: '52%' }} />
+          </div>
+          <p>Waiting for first resolved incident</p>
+        </div> : <div className="chart-wrap small">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData}>
               <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ShieldAlert } from 'lucide-react';
 import { api } from '../api.js';
-import { Button, DataTable, EmptyState, Panel, SkeletonRows, StatusBadge, TableHeader, TableRow } from '../components/ui.jsx';
+import { Button, DataTable, EmptyState, Panel, SkeletonRows, StatusBadge, StatusDot, TableHeader, TableRow } from '../components/ui.jsx';
 
 export default function IncidentsPage() {
   const navigate = useNavigate();
@@ -43,10 +44,15 @@ export default function IncidentsPage() {
           <SkeletonRows rows={5} />
         ) : rows.length === 0 ? (
           total === 0 ? (
-            <EmptyState title="◎ No incidents recorded" copy="The agent is monitoring your services. Incidents will appear here automatically when anomalies are detected." />
+            <div className="incident-empty">
+              <ShieldAlert size={58} strokeWidth={1.4} />
+              <h2>No incidents detected</h2>
+              <p>SentinelAI is actively monitoring your services. When an anomaly is detected, incidents will appear here with full timeline and actions.</p>
+              <span className="watching-pill"><StatusDot status="healthy" /> Agent watching 3 services</span>
+            </div>
           ) : (
             <EmptyState
-              title="◎ No incidents match your filters"
+              title="No incidents match your filters"
               copy="Adjust the status filter to see more incidents."
               action={<Button size="sm" variant="ghost" onClick={() => setFilter('all')}>Clear filters</Button>}
             />
@@ -57,10 +63,10 @@ export default function IncidentsPage() {
             {rows.map((incident) => (
               <TableRow key={incident.id} onClick={() => navigate(`/incidents/${incident.id}`)}>
                 <span><StatusBadge status={incident.severity} /></span>
-                <span>{incident.service || '—'}</span>
+                <span>{incident.service || '-'}</span>
                 <span className="truncate" title={incident.hypothesis || ''}>{truncate(incident.hypothesis)}</span>
                 <span>{incident.status}</span>
-                <span>{incident.jira_ticket_id || '—'}</span>
+                <span>{incident.jira_ticket_id || '-'}</span>
                 <span>{formatTime(incident.detected_at)}</span>
               </TableRow>
             ))}
@@ -72,11 +78,11 @@ export default function IncidentsPage() {
 }
 
 function truncate(value = '', limit = 60) {
-  return value.length > limit ? `${value.slice(0, limit - 1)}…` : value || '—';
+  return value.length > limit ? `${value.slice(0, limit - 1)}...` : value || '-';
 }
 
 function formatTime(value) {
-  if (!value) return '—';
+  if (!value) return '-';
   const then = new Date(value).getTime();
   const minutes = Math.round((Date.now() - then) / 60000);
   if (Number.isFinite(minutes) && minutes < 60) return `${Math.max(0, minutes)} minutes ago`;

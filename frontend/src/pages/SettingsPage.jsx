@@ -148,10 +148,10 @@ export default function SettingsPage() {
           <Panel>
             <SectionHeader title="Add service" />
             <div className="form-grid">
-              <input placeholder="name" value={serviceDraft.name} onChange={(event) => setServiceDraft({ ...serviceDraft, name: event.target.value })} />
-              <input placeholder="display name" value={serviceDraft.display_name} onChange={(event) => setServiceDraft({ ...serviceDraft, display_name: event.target.value })} />
-              <input placeholder="team" value={serviceDraft.team} onChange={(event) => setServiceDraft({ ...serviceDraft, team: event.target.value })} />
-              <input type="number" value={serviceDraft.sla_target} onChange={(event) => setServiceDraft({ ...serviceDraft, sla_target: Number(event.target.value) })} />
+              <label className="field"><span>Name</span><input placeholder="name" value={serviceDraft.name} onChange={(event) => setServiceDraft({ ...serviceDraft, name: event.target.value })} /></label>
+              <label className="field"><span>Display name</span><input placeholder="display name" value={serviceDraft.display_name} onChange={(event) => setServiceDraft({ ...serviceDraft, display_name: event.target.value })} /></label>
+              <label className="field"><span>Team</span><input placeholder="team" value={serviceDraft.team} onChange={(event) => setServiceDraft({ ...serviceDraft, team: event.target.value })} /></label>
+              <label className="field"><span>SLA target</span><input type="number" value={serviceDraft.sla_target} onChange={(event) => setServiceDraft({ ...serviceDraft, sla_target: Number(event.target.value) })} /></label>
             </div>
             <Button loading={busy === 'service'} disabled={!serviceDraft.name.trim()} onClick={createService}>Create service</Button>
           </Panel>
@@ -162,11 +162,11 @@ export default function SettingsPage() {
         <Panel>
           <SectionHeader title="On-call schedule" />
           <div className="form-grid">
-            <input placeholder="Engineer name" value={oncall.engineer_name} onChange={(event) => setOncall({ ...oncall, engineer_name: event.target.value })} />
-            <input placeholder="@slack" value={oncall.slack_handle} onChange={(event) => setOncall({ ...oncall, slack_handle: event.target.value })} />
-            <input placeholder="team" value={oncall.team} onChange={(event) => setOncall({ ...oncall, team: event.target.value })} />
-            <input type="datetime-local" value={oncall.start_time} onChange={(event) => setOncall({ ...oncall, start_time: event.target.value })} />
-            <input type="datetime-local" value={oncall.end_time} onChange={(event) => setOncall({ ...oncall, end_time: event.target.value })} />
+            <label className="field"><span>Engineer name</span><input placeholder="Engineer name" value={oncall.engineer_name} onChange={(event) => setOncall({ ...oncall, engineer_name: event.target.value })} /></label>
+            <label className="field"><span>Slack handle</span><input placeholder="@slack" value={oncall.slack_handle} onChange={(event) => setOncall({ ...oncall, slack_handle: event.target.value })} /></label>
+            <label className="field"><span>Team</span><input placeholder="team" value={oncall.team} onChange={(event) => setOncall({ ...oncall, team: event.target.value })} /></label>
+            <label className="field"><span>Start time</span><input type="datetime-local" value={oncall.start_time} onChange={(event) => setOncall({ ...oncall, start_time: event.target.value })} /></label>
+            <label className="field"><span>End time</span><input type="datetime-local" value={oncall.end_time} onChange={(event) => setOncall({ ...oncall, end_time: event.target.value })} /></label>
           </div>
           {!oncall.engineer_name && (
             <EmptyState title="No on-call schedule configured" copy="Add engineers in Settings → On-call." />
@@ -180,6 +180,7 @@ export default function SettingsPage() {
 
 function IntegrationCard({ item, saved, onSave, onTest, busy }) {
   const [config, setConfig] = useState(saved?.config || {});
+  const hasSavedValues = !item.comingSoon && item.fields.some((field) => Boolean(saved?.config?.[field]));
   useEffect(() => {
     setConfig(saved?.config || {});
   }, [saved?.id]);
@@ -188,18 +189,25 @@ function IntegrationCard({ item, saved, onSave, onTest, busy }) {
     <Panel>
       <div className="service-card-head">
         <StatusBadge status={item.comingSoon ? 'neutral' : saved?.enabled ? 'healthy' : 'critical'} />
+        {!item.comingSoon && (
+          <span className={`connection-badge ${hasSavedValues ? 'connected' : 'missing'}`}>
+            {hasSavedValues ? 'Connected' : 'Not configured'}
+          </span>
+        )}
       </div>
       <h2>{item.title}</h2>
       {item.comingSoon && <p className="muted">Available soon</p>}
       <div className="form-grid single">
         {!item.comingSoon && item.fields.map((field) => (
-          <input
-            key={field}
-            placeholder={field}
-            type={field.includes('token') || field.includes('key') ? 'password' : 'text'}
-            value={config[field] || ''}
-            onChange={(event) => setConfig({ ...config, [field]: event.target.value })}
-          />
+          <label className="field" key={field}>
+            <span>{field.replaceAll('_', ' ')}</span>
+            <input
+              placeholder={field}
+              type={field.includes('token') || field.includes('key') ? 'password' : 'text'}
+              value={config[field] || ''}
+              onChange={(event) => setConfig({ ...config, [field]: event.target.value })}
+            />
+          </label>
         ))}
       </div>
       <div className="button-row">

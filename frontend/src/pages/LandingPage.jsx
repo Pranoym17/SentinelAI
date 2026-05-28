@@ -42,7 +42,7 @@ export default function LandingPage() {
           incident record while engineers focus on the fix.
         </p>
         <div className="button-row">
-          <Button icon={Rocket} variant="primary" size="lg" onClick={() => navigate('/onboarding')}>Get started</Button>
+          <Button icon={Rocket} variant="primary" size="lg" className="btn-hero" onClick={() => navigate('/onboarding')}>Get started</Button>
           <Button icon={Play} variant="secondary" size="lg" onClick={() => navigate('/dashboard')}>View dashboard</Button>
         </div>
         <div className="feature-list">
@@ -58,6 +58,7 @@ export default function LandingPage() {
         </div>
       </section>
       <aside className="landing-terminal">
+        <span className="terminal-eyebrow">Live incident response</span>
         <TerminalPanel title="preview" lines={lines} live height={420} />
       </aside>
     </main>

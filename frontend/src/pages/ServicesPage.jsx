@@ -67,11 +67,20 @@ export default function ServicesPage() {
                 <h2>{service.display_name || service.name}</h2>
                 <StatusBadge status={status?.status || 'healthy'} />
               </div>
-              <p className="muted">{service.description || '—'}</p>
-              <div className="mini-stats">
-                <span>{service.team || '—'}</span>
-                <span>{service.sla_target}% SLA</span>
-                <span>{status?.remaining_budget_minutes ?? '—'}m budget</span>
+              <p className="muted">{service.description || '-'}</p>
+              <div className="service-stat-lines">
+                <div>
+                  <span>Team</span>
+                  <strong>{service.team || '-'}</strong>
+                </div>
+                <div>
+                  <span>SLA</span>
+                  <strong>{service.sla_target}%</strong>
+                </div>
+                <div>
+                  <span>Budget</span>
+                  <strong>{status?.remaining_budget_minutes ?? '-'}m</strong>
+                </div>
               </div>
             </Panel>
           );

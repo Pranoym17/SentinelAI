@@ -74,10 +74,16 @@ export default function Layout() {
           })}
         </nav>
 
-        <div className="oncall-card">
+        <div className={`oncall-card ${oncall ? '' : 'unassigned'}`}>
           <span>On-call</span>
-          <strong>{oncall?.name || 'Unassigned'}</strong>
-          <small>{oncall?.slack_handle || 'No active schedule'}</small>
+          {oncall ? (
+            <>
+              <strong>{oncall.name}</strong>
+              <small>{oncall.slack_handle || 'No active schedule'}</small>
+            </>
+          ) : (
+            <span className="warning-pill">Unassigned / No active schedule</span>
+          )}
         </div>
       </aside>
       <div className="content-shell">
