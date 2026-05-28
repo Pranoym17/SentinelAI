@@ -7,6 +7,7 @@ from app.agents.post_mortem_agent import PostMortemAgent
 from app.agents.status_agent import StatusAgent
 from app.services.memory_service import MemoryService
 from app.services.commander_service import CommanderService
+from app.services.post_mortem_followup_service import PostMortemFollowupService
 from app.services.response_agent import ResponseAgent
 from app.services.serializers import serialize_incident
 from app.services.runbook_service import RunbookService
@@ -108,6 +109,7 @@ class IncidentService:
             f"Updated successful runbook: {runbook.title}",
             {"runbook_id": runbook.id, "steps_count": len(runbook.steps or [])},
         )
+        followups = PostMortemFollowupService(self.db).create_followups(incident)
         config = self.latest_config()
         if config:
             ResponseAgent(self.db, config).finalize_resolution(incident)
@@ -118,6 +120,7 @@ class IncidentService:
             "status": "resolved",
             "duration_minutes": incident.duration_minutes,
             "post_mortem": incident.post_mortem,
+            "followups": followups,
         }
 
     def status_response(self, payload: StatusQueryIn) -> dict:

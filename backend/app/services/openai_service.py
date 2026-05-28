@@ -143,6 +143,93 @@ class OpenAIService:
             "manager_brief": data.get("manager_brief") or "Manager brief unavailable.",
         }
 
+    def generate_post_mortem_followups(self, context: dict) -> list[dict]:
+        if not self.client:
+            raise RuntimeError("OpenAI client is not configured")
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Extract prevention follow-up tasks from an incident post-mortem. "
+                        "Return JSON only with an items array. Each item has title, reason, and priority. "
+                        "Keep titles actionable and under 90 characters."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "context": context,
+                            "schema": {
+                                "items": [
+                                    {
+                                        "title": "verb-first follow-up task",
+                                        "reason": "why this prevents recurrence",
+                                        "priority": "Highest | High | Medium | Low",
+                                    }
+                                ]
+                            },
+                        },
+                        indent=2,
+                        default=str,
+                    ),
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            timeout=20,
+        )
+        data = json.loads(response.choices[0].message.content or "{}")
+        return data.get("items") or []
+
+    def generate_fix_preview(self, context: dict) -> dict:
+        if not self.client:
+            raise RuntimeError("OpenAI client is not configured")
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You propose a minimal code fix for an incident. Return JSON only. "
+                        "Use unified diff format in the diff field. Do not claim the patch was applied. "
+                        "Prefer files mentioned in recent commits."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "context": context,
+                            "schema": {
+                                "title": "short fix title",
+                                "summary": "why this fix addresses the incident",
+                                "files": [
+                                    {
+                                        "path": "file path",
+                                        "before_risk": "risk in current code",
+                                        "proposed_change": "specific change",
+                                    }
+                                ],
+                                "diff": "unified diff preview",
+                                "confidence": 0,
+                            },
+                        },
+                        indent=2,
+                        default=str,
+                    ),
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            timeout=25,
+        )
+        return json.loads(response.choices[0].message.content or "{}")
+
     def correlate_incidents(self, context: dict) -> dict:
         if not self.client:
             raise RuntimeError("OpenAI client is not configured")

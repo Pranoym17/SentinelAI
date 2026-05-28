@@ -5,6 +5,7 @@ from app.database import get_db
 from app.schemas import ResolveIncidentIn, RollbackIn, SignalIn, StatusQueryIn
 from app.services.incident_service import IncidentService
 from app.services.blast_radius_service import BlastRadiusService
+from app.services.fix_preview_service import FixPreviewService
 from app.services.rollback_service import RollbackService
 
 
@@ -96,6 +97,15 @@ def analyze_blast_radius(incident_id: int, db: Session = Depends(get_db)) -> dic
     )
     db.commit()
     return result
+
+
+@router.post("/api/incidents/{incident_id}/fix-preview")
+def generate_fix_preview(incident_id: int, db: Session = Depends(get_db)) -> dict:
+    service = IncidentService(db)
+    incident = service.get(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return FixPreviewService(db).generate(incident)
 
 
 @router.post("/api/status")
