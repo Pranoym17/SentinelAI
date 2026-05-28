@@ -1,11 +1,27 @@
-export function Button({ children, variant = 'secondary', size = 'md', loading = false, disabled = false, className = '', ...props }) {
+export function Button({
+  children,
+  variant = 'secondary',
+  size = 'md',
+  loading = false,
+  disabled = false,
+  icon: Icon,
+  className = '',
+  ...props
+}) {
   return (
     <button
       className={`btn btn-${variant} btn-${size} ${className}`}
       disabled={disabled || loading}
       {...props}
     >
-      {loading ? '...' : children}
+      {loading ? (
+        <span className="btn-loader" aria-label="Loading" />
+      ) : (
+        <>
+          {Icon && <Icon size={15} strokeWidth={1.9} />}
+          <span>{children}</span>
+        </>
+      )}
     </button>
   );
 }

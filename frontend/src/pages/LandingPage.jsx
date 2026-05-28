@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { BarChart3, BookOpen, CircleDot, Play, Rocket, RotateCcw, TriangleAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button, TerminalPanel } from '../components/ui.jsx';
@@ -9,6 +10,15 @@ const previewSteps = [
   { step: 'DEPLOY', detail: 'payments-api v2.4.1 deployed 14m ago', confidence: 80 },
   { step: 'COMMIT', detail: 'a3f92c1 touched payments/sdk.py', confidence: 87 },
   { step: 'ACTION', detail: 'jira created, slack posted, rollback ready', confidence: 95 },
+];
+
+const features = [
+  { label: 'anomaly detection', icon: CircleDot },
+  { label: 'SLA aware routing', icon: TriangleAlert },
+  { label: 'incident memory', icon: BookOpen },
+  { label: 'runbook generation', icon: CircleDot },
+  { label: 'rollback support', icon: RotateCcw },
+  { label: 'analytics', icon: BarChart3 },
 ];
 
 export default function LandingPage() {
@@ -32,16 +42,19 @@ export default function LandingPage() {
           incident record while engineers focus on the fix.
         </p>
         <div className="button-row">
-          <Button variant="primary" size="lg" onClick={() => navigate('/onboarding')}>Get started</Button>
-          <Button variant="secondary" size="lg" onClick={() => navigate('/dashboard')}>View dashboard</Button>
+          <Button icon={Rocket} variant="primary" size="lg" onClick={() => navigate('/onboarding')}>Get started</Button>
+          <Button icon={Play} variant="secondary" size="lg" onClick={() => navigate('/dashboard')}>View dashboard</Button>
         </div>
         <div className="feature-list">
-          <span>◇ anomaly detection</span>
-          <span>△ SLA aware routing</span>
-          <span>≡ incident memory</span>
-          <span>◎ runbook generation</span>
-          <span>⟳ rollback support</span>
-          <span>▦ analytics</span>
+          {features.map((feature) => {
+            const Icon = feature.icon;
+            return (
+              <span key={feature.label}>
+                <Icon size={13} strokeWidth={1.9} />
+                {feature.label}
+              </span>
+            );
+          })}
         </div>
       </section>
       <aside className="landing-terminal">

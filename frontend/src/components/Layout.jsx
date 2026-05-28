@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react';
+import {
+  Activity,
+  BarChart3,
+  BookOpen,
+  Gauge,
+  Settings,
+  ShieldCheck,
+  TriangleAlert,
+} from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { api } from '../api.js';
 
 const nav = [
-  { to: '/dashboard', label: 'Dashboard', glyph: '◎' },
-  { to: '/incidents', label: 'Incidents', glyph: '△' },
-  { to: '/services', label: 'Services', glyph: '◇' },
-  { to: '/runbooks', label: 'Runbooks', glyph: '≡' },
-  { to: '/analytics', label: 'Analytics', glyph: '▦' },
-  { to: '/settings', label: 'Settings', glyph: '⚙' },
+  { to: '/dashboard', label: 'Dashboard', icon: Gauge },
+  { to: '/incidents', label: 'Incidents', icon: TriangleAlert },
+  { to: '/services', label: 'Services', icon: Activity },
+  { to: '/runbooks', label: 'Runbooks', icon: BookOpen },
+  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function Layout() {
@@ -40,8 +49,10 @@ export default function Layout() {
     <div className="app-shell">
       <aside className="sidebar">
         <NavLink to="/" className="brand">
-          <span className="brand-mark">S</span>
-          SentinelAI
+          <span className="brand-mark">
+            <ShieldCheck size={14} strokeWidth={2} />
+          </span>
+          <span>SentinelAI</span>
         </NavLink>
 
         {activeCount > 0 && (
@@ -52,12 +63,15 @@ export default function Layout() {
         )}
 
         <nav className="sidebar-nav">
-          {nav.map((item) => (
-            <NavLink className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} to={item.to} key={item.to}>
-              <span className="nav-glyph">{item.glyph}</span>
-              {item.label}
-            </NavLink>
-          ))}
+          {nav.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} to={item.to} key={item.to}>
+                <Icon className="nav-icon" size={15} strokeWidth={1.8} />
+                <span>{item.label}</span>
+              </NavLink>
+            );
+          })}
         </nav>
 
         <div className="oncall-card">
