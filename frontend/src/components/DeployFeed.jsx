@@ -1,22 +1,22 @@
+import { EmptyState, Panel, SectionHeader, StatusBadge } from './ui.jsx';
+
 export default function DeployFeed({ deploys }) {
   return (
-    <section className="panel compact-panel">
-      <p className="eyebrow">Recent Deploys</p>
+    <Panel className="compact">
+      <SectionHeader title="Recent deploys" meta={`${deploys?.length || 0} entries`} />
       <div className="deploy-list">
+        {(deploys || []).length === 0 && <EmptyState title="No deploys" copy="Recent deploys appear after demo seed." />}
         {(deploys || []).map((deploy) => (
-          <article className={`deploy-item ${deploy.suspected_cause ? 'suspected' : ''}`} key={deploy.id}>
+          <article className="deploy-item" key={deploy.id}>
             <div>
               <strong>{deploy.service}</strong>
               <span>{deploy.version}</span>
             </div>
-            <p>{deploy.changes_summary || 'No summary provided'}</p>
-            <small>
-              {new Date(deploy.deployed_at).toLocaleTimeString()} by {deploy.author}
-            </small>
-            {deploy.suspected_cause && <b>SUSPECTED CAUSE</b>}
+            <small>{new Date(deploy.deployed_at).toLocaleTimeString()} by {deploy.author}</small>
+            {deploy.suspected_cause && <StatusBadge status="critical" />}
           </article>
         ))}
       </div>
-    </section>
+    </Panel>
   );
 }

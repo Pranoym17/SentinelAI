@@ -1,25 +1,15 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import {
-  Activity,
-  BarChart3,
-  BookOpen,
-  Gauge,
-  LayoutDashboard,
-  Settings,
-  ShieldCheck,
-  Siren,
-} from 'lucide-react';
 
 import { api } from '../api.js';
 
 const nav = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/incidents', label: 'Incidents', icon: Siren },
-  { to: '/services', label: 'Services', icon: Activity },
-  { to: '/runbooks', label: 'Runbooks', icon: BookOpen },
-  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/dashboard', label: 'Dashboard', glyph: '◎' },
+  { to: '/incidents', label: 'Incidents', glyph: '△' },
+  { to: '/services', label: 'Services', glyph: '◇' },
+  { to: '/runbooks', label: 'Runbooks', glyph: '≡' },
+  { to: '/analytics', label: 'Analytics', glyph: '▦' },
+  { to: '/settings', label: 'Settings', glyph: '⚙' },
 ];
 
 export default function Layout() {
@@ -50,39 +40,32 @@ export default function Layout() {
     <div className="app-shell">
       <aside className="sidebar">
         <NavLink to="/" className="brand">
-          <ShieldCheck size={24} />
-          <span>SentinelAI</span>
+          <span className="brand-mark">S</span>
+          SentinelAI
         </NavLink>
 
         {activeCount > 0 && (
           <NavLink to="/incidents" className="incident-alert">
-            <span className="status-dot-inline critical" />
+            <span className="status-dot critical" />
             {activeCount} active incident{activeCount === 1 ? '' : 's'}
           </NavLink>
         )}
 
         <nav className="sidebar-nav">
-          {nav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} to={item.to} key={item.to}>
-                <Icon size={18} />
-                {item.label}
-              </NavLink>
-            );
-          })}
+          {nav.map((item) => (
+            <NavLink className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} to={item.to} key={item.to}>
+              <span className="nav-glyph">{item.glyph}</span>
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
 
         <div className="oncall-card">
-          <Gauge size={16} />
-          <div>
-            <span>ON CALL</span>
-            <strong>{oncall?.name || 'Unassigned'}</strong>
-            <small>{oncall?.slack_handle || 'No active schedule'}</small>
-          </div>
+          <span>On-call</span>
+          <strong>{oncall?.name || 'Unassigned'}</strong>
+          <small>{oncall?.slack_handle || 'No active schedule'}</small>
         </div>
       </aside>
-
       <div className="content-shell">
         <Outlet />
       </div>

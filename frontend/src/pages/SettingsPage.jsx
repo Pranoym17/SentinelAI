@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
-import { Card, EmptyState } from '../components/ui.jsx';
+import { Button, EmptyState, Panel, SectionHeader, StatusBadge } from '../components/ui.jsx';
 
 const integrationTypes = [
   { type: 'slack', title: 'Slack', fields: ['webhook_url', 'channel'], testable: true },
@@ -90,7 +90,6 @@ export default function SettingsPage() {
     <main className="page-shell">
       <div className="page-head">
         <div>
-          <p className="eyebrow">Control plane</p>
           <h1>Settings</h1>
         </div>
       </div>
@@ -98,16 +97,16 @@ export default function SettingsPage() {
       {error && <div className="notice">{error}</div>}
       <div className="tabs">
         {['integrations', 'services', 'on-call'].map((item) => (
-          <button type="button" className={tab === item ? 'active' : 'ghost-button'} onClick={() => setTab(item)} key={item}>
+          <button type="button" className={tab === item ? 'active' : ''} onClick={() => setTab(item)} key={item}>
             {item}
           </button>
         ))}
       </div>
 
-      {loading && <Card><EmptyState title="Loading settings" copy="Fetching integrations and services." /></Card>}
+      {loading && <Panel><EmptyState title="Loading settings" copy="Fetching integrations and services." /></Panel>}
 
       {tab === 'integrations' && !loading && (
-        <div className="service-grid">
+        <div className="card-grid three">
           {integrationTypes.map((item) => (
             <IntegrationCard
               key={item.type}
@@ -122,32 +121,32 @@ export default function SettingsPage() {
 
       {tab === 'services' && !loading && (
         <>
-          <div className="service-grid">
-            {services.length === 0 && <Card><EmptyState title="No services" copy="Create a monitored service below." /></Card>}
+          <div className="card-grid three">
+            {services.length === 0 && <Panel><EmptyState title="No services" copy="Create a monitored service below." /></Panel>}
             {services.map((service) => (
-              <Card key={service.id}>
-                <p className="eyebrow">{service.team || 'No team'}</p>
+              <Panel key={service.id}>
+                <span className="label">{service.team || 'No team'}</span>
                 <h2>{service.display_name || service.name}</h2>
                 <p className="muted">{service.sla_target}% SLA target</p>
-              </Card>
+              </Panel>
             ))}
           </div>
-          <Card>
-            <p className="eyebrow">Add service</p>
+          <Panel>
+            <SectionHeader title="Add service" />
             <div className="form-grid">
               <input placeholder="name" value={serviceDraft.name} onChange={(event) => setServiceDraft({ ...serviceDraft, name: event.target.value })} />
               <input placeholder="display name" value={serviceDraft.display_name} onChange={(event) => setServiceDraft({ ...serviceDraft, display_name: event.target.value })} />
               <input placeholder="team" value={serviceDraft.team} onChange={(event) => setServiceDraft({ ...serviceDraft, team: event.target.value })} />
               <input type="number" value={serviceDraft.sla_target} onChange={(event) => setServiceDraft({ ...serviceDraft, sla_target: Number(event.target.value) })} />
             </div>
-            <button type="button" onClick={createService}>Create service</button>
-          </Card>
+            <Button onClick={createService}>Create service</Button>
+          </Panel>
         </>
       )}
 
       {tab === 'on-call' && !loading && (
-        <Card>
-          <p className="eyebrow">On-call schedule</p>
+        <Panel>
+          <SectionHeader title="On-call schedule" />
           <div className="form-grid">
             <input placeholder="Engineer name" value={oncall.engineer_name} onChange={(event) => setOncall({ ...oncall, engineer_name: event.target.value })} />
             <input placeholder="@slack" value={oncall.slack_handle} onChange={(event) => setOncall({ ...oncall, slack_handle: event.target.value })} />
@@ -155,8 +154,8 @@ export default function SettingsPage() {
             <input type="datetime-local" value={oncall.start_time} onChange={(event) => setOncall({ ...oncall, start_time: event.target.value })} />
             <input type="datetime-local" value={oncall.end_time} onChange={(event) => setOncall({ ...oncall, end_time: event.target.value })} />
           </div>
-          <button type="button" disabled={!oncall.engineer_name} onClick={saveOncall}>Save on-call</button>
-        </Card>
+          <Button disabled={!oncall.engineer_name} onClick={saveOncall}>Save on-call</Button>
+        </Panel>
       )}
     </main>
   );
@@ -169,8 +168,10 @@ function IntegrationCard({ item, saved, onSave, onTest }) {
   }, [saved?.id]);
 
   return (
-    <Card>
-      <p className="eyebrow">{item.comingSoon ? 'Coming soon' : saved?.enabled ? 'Connected' : 'Not connected'}</p>
+    <Panel>
+      <div className="service-card-head">
+        <StatusBadge status={item.comingSoon ? 'neutral' : saved?.enabled ? 'healthy' : 'critical'} />
+      </div>
       <h2>{item.title}</h2>
       <div className="form-grid single">
         {item.fields.map((field) => (
@@ -185,9 +186,9 @@ function IntegrationCard({ item, saved, onSave, onTest }) {
         ))}
       </div>
       <div className="button-row">
-        <button type="button" disabled={item.comingSoon} onClick={() => onSave(item.type, config)}>Save</button>
-        {item.testable && <button type="button" className="ghost-button" onClick={() => onTest(item.type)}>Test</button>}
+        <Button disabled={item.comingSoon} onClick={() => onSave(item.type, config)}>Save</Button>
+        {item.testable && <Button variant="secondary" onClick={() => onTest(item.type)}>Test</Button>}
       </div>
-    </Card>
+    </Panel>
   );
 }

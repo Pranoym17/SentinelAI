@@ -11,6 +11,7 @@ import MetricsPanel from '../components/MetricsPanel.jsx';
 import PostMortemViewer from '../components/PostMortemViewer.jsx';
 import RollbackTerminal from '../components/RollbackTerminal.jsx';
 import TimelineFeed from '../components/TimelineFeed.jsx';
+import { MetricCell, Panel, StatusBadge } from '../components/ui.jsx';
 
 export default function Dashboard() {
   const [state, setState] = useState(null);
@@ -87,24 +88,24 @@ export default function Dashboard() {
     <main className="dashboard-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Monitoring</p>
-          <h1>SentinelAI Dashboard</h1>
+          <h1>Dashboard</h1>
         </div>
-        <div className={`status-pill ${incident ? 'active' : ''}`}>
-          <span className="status-dot" />
-          {incident ? `${incident.severity} active` : 'Standing by'}
-        </div>
+        <StatusBadge status={incident ? incident.severity : 'healthy'} />
       </header>
 
       {error && <div className="notice">{error}</div>}
-      <section className="panel agent-stepper">
+      <Panel className="compact">
+        <div className="action-row">
         {['detection', 'investigation_completed', 'jira_created', 'slack_sent', 'rollback_completed'].map((step) => (
-          <span className={activeTimeline.some((event) => event.event_type === step) ? 'done' : ''} key={step}>
+          <span className={`status-badge ${activeTimeline.some((event) => event.event_type === step) ? 'healthy' : 'neutral'}`} key={step}>
             {step.replaceAll('_', ' ')}
           </span>
         ))}
-        <strong>{countdown ? `Autonomous detection in ${countdown}s` : agentStep ? `Latest: ${agentStep.event_type.replaceAll('_', ' ')}` : 'Agent is watching'}</strong>
-      </section>
+        <span className="label" style={{ alignSelf: 'center', marginLeft: 'auto' }}>
+          {countdown ? `Autonomous detection in ${countdown}s` : agentStep ? `Latest: ${agentStep.event_type.replaceAll('_', ' ')}` : 'Agent is watching'}
+        </span>
+        </div>
+      </Panel>
 
       <DemoControlBar
         busy={busy}
@@ -126,28 +127,23 @@ export default function Dashboard() {
         }
       />
 
-      <div className="dashboard-grid">
-        <section className="main-stack">
-          <section className="stats-grid">
-            <div className="panel stat-card">
-              <p className="eyebrow">System score</p>
-              <h2>{incident ? '68' : '94'}</h2>
-            </div>
-            <div className="panel stat-card">
-              <p className="eyebrow">Active</p>
-              <h2>{incidents.active?.length || 0}</h2>
-            </div>
-            <div className="panel stat-card">
-              <p className="eyebrow">SLA</p>
-              <h2>{slaWarning ? 'At risk' : 'Healthy'}</h2>
-            </div>
-            <div className="panel stat-card">
-              <p className="eyebrow">Correlation</p>
-              <h2>{correlation ? 'Detected' : 'Clear'}</h2>
-            </div>
-          </section>
-          <MetricChart history={history} deploys={state?.recent_deploys || []} />
+      <section className="stats-row">
+        <MetricCell label="System health" value={incident ? '68' : '94'} status={incident ? 'warning' : 'healthy'} />
+        <MetricCell label="Active" value={incidents.active?.length || 0} status={incident ? 'critical' : 'healthy'} />
+        <MetricCell label="MTTR" value="0" unit="m" />
+        <MetricCell label="SLA" value={slaWarning ? 'risk' : 'ok'} status={slaWarning ? 'warning' : 'healthy'} />
+        <MetricCell label="On-call" value="set" status="healthy" />
+      </section>
+
+      <div className="grid-dashboard">
+        <aside className="stack">
           <MetricsPanel metrics={state?.metrics || []} />
+          <DeployFeed deploys={state?.recent_deploys || []} />
+          <IntegrationStatus integrations={state?.integrations || {}} />
+        </aside>
+        <section className="stack">
+          <MetricChart history={history} deploys={state?.recent_deploys || []} />
+          <TimelineFeed timeline={activeTimeline} />
           <IncidentCommandPanel
             incident={incident}
             onRefresh={refresh}
@@ -155,16 +151,17 @@ export default function Dashboard() {
           />
           <PostMortemViewer incident={incident} markdown={postMortem} />
         </section>
+      </div>
 
-        <aside className="right-rail">
-          <IntegrationStatus integrations={state?.integrations || {}} />
-          <DeployFeed deploys={state?.recent_deploys || []} />
+      <div className="grid-dashboard" style={{ marginTop: 16 }}>
+        <section className="stack">
           <RollbackTerminal
             incident={incident}
             busy={busy}
             onRollback={() => incident && run(() => api.rollbackIncident(incident.incident_id, 0))}
           />
-          <TimelineFeed timeline={activeTimeline} />
+        </section>
+        <aside className="stack">
           <IncidentHistory incidents={incidents} onSelect={selectHistory} />
         </aside>
       </div>

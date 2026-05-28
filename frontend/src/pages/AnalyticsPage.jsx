@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../api.js';
-import { Card, EmptyState } from '../components/ui.jsx';
+import { EmptyState, MetricCell, Panel, SectionHeader } from '../components/ui.jsx';
 
 export default function AnalyticsPage() {
   const [analytics, setAnalytics] = useState(null);
@@ -25,20 +25,20 @@ export default function AnalyticsPage() {
     <main className="page-shell">
       <div className="page-head">
         <div>
-          <p className="eyebrow">Reliability</p>
           <h1>Analytics</h1>
         </div>
       </div>
       {error && <div className="notice">{error}</div>}
-      {loading && <Card><EmptyState title="Loading analytics" copy="Calculating reliability metrics." /></Card>}
-      <div className="stats-grid">
-        <Card><p className="eyebrow">MTTD</p><h2>{analytics?.mttd_seconds ?? 0}s</h2></Card>
-        <Card><p className="eyebrow">MTTR</p><h2>{analytics?.mttr_minutes ?? 0}m</h2></Card>
-        <Card><p className="eyebrow">Total incidents</p><h2>{analytics?.total_incidents ?? 0}</h2></Card>
-        <Card><p className="eyebrow">SLA compliance</p><h2>{analytics?.sla_compliance ?? 100}%</h2></Card>
+      {loading && <Panel><EmptyState title="Loading analytics" copy="Calculating reliability metrics." /></Panel>}
+      <div className="stats-row">
+        <MetricCell label="MTTD" value={analytics?.mttd_seconds ?? 0} unit="s" />
+        <MetricCell label="MTTR" value={analytics?.mttr_minutes ?? 0} unit="m" />
+        <MetricCell label="Incidents" value={analytics?.total_incidents ?? 0} />
+        <MetricCell label="SLA compliance" value={analytics?.sla_compliance ?? 100} unit="%" status={(analytics?.sla_compliance ?? 100) < 100 ? 'warning' : 'healthy'} />
+        <MetricCell label="Agent accuracy" value={analytics?.agent_accuracy ?? 0} unit="%" />
       </div>
-      <Card>
-        <p className="eyebrow">Incidents by service</p>
+      <Panel>
+        <SectionHeader title="Incidents by service" />
         {chartData.length === 0 ? <EmptyState title="No resolved incidents" copy="Resolve an incident to populate this chart." /> : <div className="chart-wrap small">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData}>
@@ -50,9 +50,9 @@ export default function AnalyticsPage() {
             </BarChart>
           </ResponsiveContainer>
         </div>}
-      </Card>
-      <Card>
-        <p className="eyebrow">SLA status</p>
+      </Panel>
+      <Panel>
+        <SectionHeader title="SLA status" />
         {sla.length === 0 ? <EmptyState title="No SLA records" copy="Add services or resolve incidents to generate SLA records." /> : <div className="data-table">
           {sla.map((row) => (
             <div className="table-row" key={row.service}>
@@ -63,7 +63,7 @@ export default function AnalyticsPage() {
             </div>
           ))}
         </div>}
-      </Card>
+      </Panel>
     </main>
   );
 }

@@ -1,41 +1,52 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Gauge, MessageSquare, TicketCheck } from 'lucide-react';
+
+import { Button, TerminalPanel } from '../components/ui.jsx';
+
+const previewSteps = [
+  { step: 'SIGNAL', detail: 'payments error_rate 0.2 -> 18.0', confidence: 30 },
+  { step: 'MEMORY', detail: 'matched previous deploy regression', confidence: 55 },
+  { step: 'DEPLOY', detail: 'payments-api v2.4.1 deployed 14m ago', confidence: 80 },
+  { step: 'COMMIT', detail: 'a3f92c1 touched payments/sdk.py', confidence: 87 },
+  { step: 'ACTION', detail: 'jira created, slack posted, rollback ready', confidence: 95 },
+];
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [count, setCount] = useState(1);
+  const lines = useMemo(() => previewSteps.slice(0, count), [count]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setCount((current) => (current >= previewSteps.length ? 1 : current + 1));
+    }, 1500);
+    return () => window.clearInterval(interval);
+  }, []);
+
   return (
     <main className="landing">
-      <div className="landing-inner">
-        <p className="landing-badge">Autonomous AI incident response</p>
-        <h1>SentinelAI</h1>
-        <p className="landing-copy">
-          Detect anomalies, investigate root cause, coordinate Jira and Slack, run rollback support, and generate
-          post-mortems from the live incident timeline.
+      <section className="landing-copy">
+        <h1><span>Autonomous</span> incident response</h1>
+        <p>
+          SentinelAI watches production signals, investigates likely cause, coordinates Jira and Slack, and writes the
+          incident record while engineers focus on the fix.
         </p>
-        <div className="landing-actions">
-          <button type="button" onClick={() => navigate('/onboarding')}>
-            Start setup
-            <ArrowRight size={18} />
-          </button>
-          <button type="button" className="ghost-button" onClick={() => navigate('/dashboard')}>
-            Open dashboard
-          </button>
+        <div className="button-row">
+          <Button variant="primary" size="lg" onClick={() => navigate('/onboarding')}>Get started</Button>
+          <Button variant="secondary" size="lg" onClick={() => navigate('/dashboard')}>View dashboard</Button>
         </div>
-        <div className="feature-row">
-          <span>
-            <Gauge size={16} />
-            SLA aware
-          </span>
-          <span>
-            <MessageSquare size={16} />
-            Slack ready
-          </span>
-          <span>
-            <TicketCheck size={16} />
-            Jira ready
-          </span>
+        <div className="feature-list">
+          <span>◇ anomaly detection</span>
+          <span>△ SLA aware routing</span>
+          <span>≡ incident memory</span>
+          <span>◎ runbook generation</span>
+          <span>⟳ rollback support</span>
+          <span>▦ analytics</span>
         </div>
-      </div>
+      </section>
+      <aside className="landing-terminal">
+        <TerminalPanel title="preview" lines={lines} live height={420} />
+      </aside>
     </main>
   );
 }

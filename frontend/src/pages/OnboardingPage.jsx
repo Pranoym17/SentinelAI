@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
 import { api } from '../api.js';
+import { Button, Panel, SectionHeader } from '../components/ui.jsx';
 
 const steps = ['Services', 'Monitoring', 'Alerts', 'Ticketing', 'Launch'];
 
@@ -12,6 +14,7 @@ export default function OnboardingPage() {
     services: [
       { name: 'payments', display_name: 'Payments API', team: 'payments-team', sla_target: 99.9 },
       { name: 'auth', display_name: 'Auth Service', team: 'auth-team', sla_target: 99.9 },
+      { name: 'api-gateway', display_name: 'API Gateway', team: 'platform', sla_target: 99.9 },
     ],
     slack_channel: '#incidents',
     jira_project_key: 'SCRUM',
@@ -40,55 +43,27 @@ export default function OnboardingPage() {
 
   return (
     <main className="onboarding">
-      <section className="onboarding-card">
+      <Panel className="onboarding-card">
         <div className="step-track">
-          {steps.map((label, index) => (
-            <button
-              type="button"
-              className={index === step ? 'active' : ''}
-              key={label}
-              onClick={() => setStep(index)}
-            >
-              {label}
-            </button>
-          ))}
+          {steps.map((label, index) => <span className={index <= step ? 'active' : ''} key={label} />)}
         </div>
+        <SectionHeader title={steps[step]} meta={`Step ${step + 1} of ${steps.length}`} />
 
         {step === 0 && <ServicesStep form={form} setForm={setForm} />}
-        {step === 1 && <ChoiceStep title="Monitoring" copy="Use the built-in simulator for demo, then connect Datadog or CloudWatch later." />}
-        {step === 2 && (
-          <FieldStep
-            title="Alerts"
-            fields={[['slack_channel', 'Slack channel']]}
-            form={form}
-            setForm={setForm}
-          />
-        )}
-        {step === 3 && (
-          <FieldStep
-            title="Ticketing"
-            fields={[['jira_project_key', 'Jira project key']]}
-            form={form}
-            setForm={setForm}
-          />
-        )}
-        {step === 4 && <ChoiceStep title="Launch" copy="Configuration is ready. Seed demo data and open the command center." />}
+        {step === 1 && <ChoiceStep copy="Simulation mode is selected. Datadog and CloudWatch can be wired later." />}
+        {step === 2 && <FieldStep fields={[['slack_channel', 'Slack channel']]} form={form} setForm={setForm} />}
+        {step === 3 && <FieldStep fields={[['jira_project_key', 'Jira project key']]} form={form} setForm={setForm} />}
+        {step === 4 && <ChoiceStep copy="Configuration is ready. Launch seeds demo data and opens the dashboard." />}
 
-        <div className="wizard-actions">
-          <button type="button" className="ghost-button" disabled={step === 0 || busy} onClick={() => setStep(step - 1)}>
-            Back
-          </button>
+        <div className="button-row" style={{ justifyContent: 'space-between', marginTop: 18 }}>
+          <Button variant="secondary" disabled={step === 0 || busy} onClick={() => setStep(step - 1)}>Back</Button>
           {step < steps.length - 1 ? (
-            <button type="button" disabled={busy} onClick={() => setStep(step + 1)}>
-              Continue
-            </button>
+            <Button onClick={() => setStep(step + 1)} disabled={busy}>Continue</Button>
           ) : (
-            <button type="button" disabled={busy} onClick={finish}>
-              {busy ? 'Launching...' : 'Launch SentinelAI'}
-            </button>
+            <Button variant="primary" onClick={finish} disabled={busy}>{busy ? 'Launching' : 'Launch'}</Button>
           )}
         </div>
-      </section>
+      </Panel>
     </main>
   );
 }
@@ -96,14 +71,12 @@ export default function OnboardingPage() {
 function ServicesStep({ form, setForm }) {
   const [draft, setDraft] = useState({ name: '', display_name: '', team: '', sla_target: 99.9 });
   return (
-    <>
-      <p className="eyebrow">Step 1</p>
-      <h1>Services to monitor</h1>
+    <div className="stack">
       <div className="service-list">
         {form.services.map((service) => (
-          <div className="service-row" key={service.name}>
+          <div className="deploy-item" key={service.name}>
             <strong>{service.display_name || service.name}</strong>
-            <span>{service.team || 'No team'} · {service.sla_target}% SLA</span>
+            <small>{service.team || 'No team'} / {service.sla_target}% SLA</small>
           </div>
         ))}
       </div>
@@ -111,9 +84,8 @@ function ServicesStep({ form, setForm }) {
         <input placeholder="service-name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
         <input placeholder="Display name" value={draft.display_name} onChange={(event) => setDraft({ ...draft, display_name: event.target.value })} />
       </div>
-      <button
-        type="button"
-        className="ghost-button"
+      <Button
+        variant="secondary"
         onClick={() => {
           if (!draft.name) return;
           setForm({ ...form, services: [...form.services, draft] });
@@ -121,38 +93,32 @@ function ServicesStep({ form, setForm }) {
         }}
       >
         Add service
-      </button>
-    </>
+      </Button>
+    </div>
   );
 }
 
-function ChoiceStep({ title, copy }) {
+function ChoiceStep({ copy }) {
   return (
-    <>
-      <p className="eyebrow">Configuration</p>
-      <h1>{title}</h1>
+    <div className="stack">
       <p className="muted">{copy}</p>
-      <div className="choice-grid">
-        <div>Built-in simulator</div>
-        <div>Real Slack/Jira via backend env or saved DB config</div>
+      <div className="info-grid">
+        <div className="info-box"><strong>Simulation</strong><span>Built-in worker</span></div>
+        <div className="info-box"><strong>Integrations</strong><span>Slack, Jira, GitHub</span></div>
       </div>
-    </>
+    </div>
   );
 }
 
-function FieldStep({ title, fields, form, setForm }) {
+function FieldStep({ fields, form, setForm }) {
   return (
-    <>
-      <p className="eyebrow">Configuration</p>
-      <h1>{title}</h1>
-      <div className="form-grid">
-        {fields.map(([key, label]) => (
-          <label className="field" key={key}>
-            {label}
-            <input value={form[key] || ''} onChange={(event) => setForm({ ...form, [key]: event.target.value })} />
-          </label>
-        ))}
-      </div>
-    </>
+    <div className="form-grid">
+      {fields.map(([key, label]) => (
+        <label className="field" key={key}>
+          {label}
+          <input value={form[key] || ''} onChange={(event) => setForm({ ...form, [key]: event.target.value })} />
+        </label>
+      ))}
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
-import { Card, EmptyState, SeverityBadge } from '../components/ui.jsx';
+import { DataTable, EmptyState, Panel, StatusBadge, TableHeader, TableRow } from '../components/ui.jsx';
 
 export default function IncidentsPage() {
   const navigate = useNavigate();
@@ -28,7 +28,6 @@ export default function IncidentsPage() {
     <main className="page-shell">
       <div className="page-head">
         <div>
-          <p className="eyebrow">Operations</p>
           <h1>Incidents</h1>
         </div>
         <select value={filter} onChange={(event) => setFilter(event.target.value)}>
@@ -38,32 +37,27 @@ export default function IncidentsPage() {
         </select>
       </div>
       {error && <div className="notice">{error}</div>}
-      <Card>
+      <Panel>
         {loading ? (
           <EmptyState title="Loading incidents" copy="Fetching active and resolved incidents." />
         ) : rows.length === 0 ? (
           <EmptyState title="No incidents yet" copy="Trigger the demo from the dashboard to populate this table." />
         ) : (
-          <div className="data-table">
-            <div className="table-row table-head">
-              <span>Severity</span>
-              <span>Service</span>
-              <span>Hypothesis</span>
-              <span>Status</span>
-              <span>Jira</span>
-            </div>
+          <DataTable columns="86px 110px minmax(240px, 1fr) 86px 90px 140px">
+            <TableHeader cells={['Severity', 'Service', 'Hypothesis', 'Status', 'Jira', 'Time']} />
             {rows.map((incident) => (
-              <button className="table-row" type="button" key={incident.id} onClick={() => navigate(`/incidents/${incident.id}`)}>
-                <span><SeverityBadge severity={incident.severity} /></span>
+              <TableRow key={incident.id} onClick={() => navigate(`/incidents/${incident.id}`)}>
+                <span><StatusBadge status={incident.severity} /></span>
                 <span>{incident.service}</span>
                 <span>{incident.hypothesis}</span>
                 <span>{incident.status}</span>
                 <span>{incident.jira_ticket_id || 'none'}</span>
-              </button>
+                <span>{new Date(incident.detected_at).toLocaleString()}</span>
+              </TableRow>
             ))}
-          </div>
+          </DataTable>
         )}
-      </Card>
+      </Panel>
     </main>
   );
 }

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Terminal } from 'lucide-react';
+
 import { api } from '../api.js';
-import { TerminalPanel } from './ui.jsx';
 import { BlastGrid } from './IncidentCommandPanel.jsx';
+import { Button, Panel, SectionHeader, TerminalPanel } from './ui.jsx';
 
 export default function RollbackTerminal({ incident, busy, onRollback }) {
   const [blastRadius, setBlastRadius] = useState(null);
@@ -27,43 +27,29 @@ export default function RollbackTerminal({ incident, busy, onRollback }) {
   }
 
   return (
-    <section className="panel compact-panel">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Rollback</p>
-          <h2>Mitigation log</h2>
-        </div>
-        <Terminal size={20} />
-      </div>
-      <button type="button" disabled={!incident || busy || checking || completed} onClick={prepareRollback}>
-        {completed ? 'Rollback complete' : checking ? 'Checking blast radius...' : 'Run rollback'}
-      </button>
-      <TerminalPanel title="rollback.log" lines={logs.map((event) => event.description)} empty="waiting for rollback..." />
+    <Panel className="compact">
+      <SectionHeader
+        title="Rollback"
+        meta={completed ? 'completed' : incident ? 'ready' : 'waiting for incident'}
+        action={
+          <Button size="sm" variant="danger" disabled={!incident || busy || checking || completed} onClick={prepareRollback}>
+            {completed ? 'Complete' : checking ? 'Checking' : 'Run rollback'}
+          </Button>
+        }
+      />
+      <TerminalPanel title="rollback.log" lines={logs.map((event) => event.description)} height={160} empty="> waiting for rollback" />
       {blastRadius && (
         <div className="modal-backdrop" role="dialog" aria-label="Confirm rollback">
           <div className="modal-panel">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Blast radius check</p>
-                <h2>{blastRadius.risk_level} rollback risk</h2>
-              </div>
-              <button type="button" className="ghost-button icon-button" onClick={() => setBlastRadius(null)}>
-                x
-              </button>
-            </div>
-            <p className="muted">{blastRadius.warning || 'No connected services found.'}</p>
+            <SectionHeader title={`${blastRadius.risk_level} rollback risk`} meta={blastRadius.warning || 'No connected services found.'} />
             <BlastGrid blastRadius={blastRadius} />
             <div className="modal-actions">
-              <button type="button" className="ghost-button" onClick={() => setBlastRadius(null)}>
-                Cancel
-              </button>
-              <button type="button" className="danger-button" onClick={confirmRollback}>
-                Confirm rollback
-              </button>
+              <Button variant="secondary" onClick={() => setBlastRadius(null)}>Cancel</Button>
+              <Button variant="danger" onClick={confirmRollback}>Confirm rollback</Button>
             </div>
           </div>
         </div>
       )}
-    </section>
+    </Panel>
   );
 }

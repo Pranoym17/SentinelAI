@@ -9,6 +9,8 @@ import {
   YAxis,
 } from 'recharts';
 
+import { Panel, SectionHeader } from './ui.jsx';
+
 function formatHistory(history) {
   const payments = history?.payments || [];
   return payments
@@ -28,14 +30,11 @@ export default function MetricChart({ history, deploys }) {
   const suspected = (deploys || []).find((deploy) => deploy.suspected_cause);
 
   return (
-    <section className="panel chart-panel">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Payments Error Rate</p>
-          <h2>Live signal</h2>
-        </div>
-        {suspected && <span className="suspected-label">SUSPECTED CAUSE: {suspected.version}</span>}
-      </div>
+    <Panel>
+      <SectionHeader
+        title="Payments error rate"
+        meta={suspected ? `Suspected deploy: ${suspected.version}` : 'Last 60 readings'}
+      />
       <div className="chart-wrap">
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={data}>
@@ -59,6 +58,6 @@ export default function MetricChart({ history, deploys }) {
           </LineChart>
         </ResponsiveContainer>
       </div>
-    </section>
+    </Panel>
   );
 }

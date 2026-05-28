@@ -1,22 +1,19 @@
+import { EmptyState, Panel, SectionHeader, StatusBadge } from './ui.jsx';
+
 export default function IncidentHistory({ incidents, onSelect }) {
   const resolved = incidents?.resolved || [];
   return (
-    <section className="panel compact-panel">
-      <p className="eyebrow">Incident History</p>
+    <Panel className="compact">
+      <SectionHeader title="Resolved incidents" meta={`${resolved.length} total`} />
       <div className="history-list">
-        {resolved.length === 0 && <p className="muted">No resolved incidents yet.</p>}
-        {resolved.map((incident) => (
-          <button
-            type="button"
-            className="history-item"
-            key={incident.id}
-            onClick={() => onSelect(incident.id)}
-          >
+        {resolved.length === 0 && <EmptyState title="No resolved incidents" copy="Resolved incidents appear after post-mortem generation." />}
+        {resolved.slice(0, 8).map((incident) => (
+          <button type="button" className="history-item" key={incident.id} onClick={() => onSelect(incident.id)}>
             <strong>{incident.service}</strong>
-            <span>{incident.severity}</span>
+            <StatusBadge status={incident.severity} />
           </button>
         ))}
       </div>
-    </section>
+    </Panel>
   );
 }

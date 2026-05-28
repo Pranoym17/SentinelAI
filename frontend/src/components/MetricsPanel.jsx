@@ -1,40 +1,39 @@
-import { Activity, Gauge } from 'lucide-react';
-
-function StatusBadge({ status }) {
-  return <span className={`badge badge-${status}`}>{status}</span>;
-}
+import { EmptyState, Panel, SectionHeader, StatusBadge } from './ui.jsx';
 
 export default function MetricsPanel({ metrics }) {
   return (
-    <section className="panel">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Live Metrics</p>
-          <h2>Watched services</h2>
+    <Panel>
+      <SectionHeader title="Watched services" meta={`${metrics.length} configured`} />
+      {metrics.length === 0 ? (
+        <EmptyState title="No metrics" copy="Metrics appear after demo seed or worker updates." />
+      ) : (
+        <div className="service-grid">
+          {metrics.map((service) => {
+            const status = service.error_rate?.status || 'healthy';
+            return (
+              <article className={`panel compact service-card ${status}`} key={service.service}>
+                <div className="service-card-head">
+                  <div>
+                    <h3>{service.service}</h3>
+                    <small className="muted">live worker feed</small>
+                  </div>
+                  <StatusBadge status={status} />
+                </div>
+                <dl>
+                  <div>
+                    <dt>Error rate</dt>
+                    <dd>{service.error_rate?.value ?? 0}%</dd>
+                  </div>
+                  <div>
+                    <dt>Latency</dt>
+                    <dd>{service.latency_ms?.value ?? 0}ms</dd>
+                  </div>
+                </dl>
+              </article>
+            );
+          })}
         </div>
-        <Activity size={22} />
-      </div>
-
-      <div className="metric-grid">
-        {metrics.map((service) => (
-          <article className="metric-card" key={service.service}>
-            <div className="metric-card-head">
-              <strong>{service.service}</strong>
-              <StatusBadge status={service.error_rate?.status || 'normal'} />
-            </div>
-            <div className="metric-row">
-              <Gauge size={18} />
-              <span>Error rate</span>
-              <strong>{service.error_rate?.value ?? 0}%</strong>
-            </div>
-            <div className="metric-row">
-              <Gauge size={18} />
-              <span>Latency</span>
-              <strong>{service.latency_ms?.value ?? 0}ms</strong>
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
+      )}
+    </Panel>
   );
 }

@@ -1,3 +1,5 @@
+import { Button, Panel, SectionHeader } from './ui.jsx';
+
 export default function PostMortemViewer({ incident, markdown }) {
   const content = markdown || incident?.post_mortem || '';
 
@@ -14,17 +16,9 @@ export default function PostMortemViewer({ incident, markdown }) {
   if (!content) return null;
 
   return (
-    <section className="panel">
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Post-Mortem</p>
-          <h2>Generated report</h2>
-        </div>
-        <button type="button" onClick={download}>
-          Download markdown
-        </button>
-      </div>
+    <Panel>
+      <SectionHeader title="Post-mortem" action={<Button size="sm" onClick={download}>Download markdown</Button>} />
       <pre className="markdown-preview">{content}</pre>
-    </section>
+    </Panel>
   );
 }

@@ -1,26 +1,25 @@
-function Dot({ ok }) {
-  return <span className={`tiny-dot ${ok ? 'ok' : 'bad'}`} />;
-}
+import { Panel, SectionHeader, StatusDot } from './ui.jsx';
 
 export default function IntegrationStatus({ integrations }) {
   const items = [
     ['OpenAI', integrations?.openai?.configured, integrations?.openai?.model || 'fallback'],
     ['Jira', integrations?.jira?.configured, integrations?.jira?.project_key || 'not configured'],
     ['Slack', integrations?.slack?.configured, integrations?.slack?.channel || 'not configured'],
+    ['GitHub', integrations?.github?.configured, integrations?.github?.configured ? 'configured' : 'not configured'],
   ];
 
   return (
-    <section className="panel compact-panel">
-      <p className="eyebrow">Integrations</p>
+    <Panel className="compact">
+      <SectionHeader title="Integrations" />
       <div className="integration-list">
         {items.map(([name, ok, detail]) => (
           <div className="integration-row" key={name}>
-            <Dot ok={ok} />
+            <StatusDot status={ok ? 'healthy' : 'critical'} />
             <strong>{name}</strong>
             <span>{detail}</span>
           </div>
         ))}
       </div>
-    </section>
+    </Panel>
   );
 }
