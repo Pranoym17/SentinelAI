@@ -25,6 +25,8 @@ def _apply_sqlite_compat_migrations():
         statements.append("ALTER TABLE incidents ADD COLUMN recommended_actions JSON")
     if "fix_preview" not in columns:
         statements.append("ALTER TABLE incidents ADD COLUMN fix_preview JSON")
+    if "github_pr" not in columns:
+        statements.append("ALTER TABLE incidents ADD COLUMN github_pr JSON")
     if "raw_model_response" not in columns:
         statements.append("ALTER TABLE incidents ADD COLUMN raw_model_response TEXT")
     if not statements:

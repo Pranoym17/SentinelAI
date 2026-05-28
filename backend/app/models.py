@@ -36,6 +36,7 @@ class Incident(Base):
     reasoning_chain: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     recommended_actions: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     fix_preview: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    github_pr: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     raw_model_response: Mapped[str | None] = mapped_column(Text, nullable=True)
     affected_teams: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     jira_ticket_id: Mapped[str | None] = mapped_column(String, nullable=True)

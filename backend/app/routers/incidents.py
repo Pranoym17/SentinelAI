@@ -6,6 +6,7 @@ from app.schemas import ResolveIncidentIn, RollbackIn, SignalIn, StatusQueryIn
 from app.services.incident_service import IncidentService
 from app.services.blast_radius_service import BlastRadiusService
 from app.services.fix_preview_service import FixPreviewService
+from app.services.github_pr_service import GitHubPRService
 from app.services.rollback_service import RollbackService
 
 
@@ -106,6 +107,15 @@ def generate_fix_preview(incident_id: int, db: Session = Depends(get_db)) -> dic
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
     return FixPreviewService(db).generate(incident)
+
+
+@router.post("/api/incidents/{incident_id}/github-pr")
+def create_github_pr(incident_id: int, db: Session = Depends(get_db)) -> dict:
+    service = IncidentService(db)
+    incident = service.get(incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return GitHubPRService(db).create_pr(incident)
 
 
 @router.post("/api/status")
