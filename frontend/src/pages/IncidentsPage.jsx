@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
 import { api } from '../api.js';
+import { artifactBadges, durationText } from '../components/incidentStory.js';
 import { Button, DataTable, EmptyState, Panel, SkeletonRows, StatusBadge, StatusDot, TableHeader, TableRow } from '../components/ui.jsx';
 
 export default function IncidentsPage() {
@@ -21,9 +22,9 @@ export default function IncidentsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const rows = [...(incidents.active || []), ...(incidents.resolved || [])].filter((incident) =>
-    filter === 'all' ? true : incident.status === filter,
-  );
+  const rows = [...(incidents.active || []), ...(incidents.resolved || [])]
+    .filter((incident) => filter === 'all' ? true : incident.status === filter)
+    .sort((a, b) => rankIncident(b) - rankIncident(a));
   const total = (incidents.active?.length || 0) + (incidents.resolved?.length || 0);
 
   return (
@@ -58,16 +59,17 @@ export default function IncidentsPage() {
             />
           )
         ) : (
-          <DataTable columns="86px 110px minmax(240px, 1fr) 86px 90px 140px">
-            <TableHeader cells={['Severity', 'Service', 'Hypothesis', 'Status', 'Jira', 'Time']} />
+          <DataTable columns="86px 110px minmax(260px, 1fr) 86px 90px 150px 150px">
+            <TableHeader cells={['Severity', 'Service', 'Hypothesis', 'Confidence', 'Status', 'Artifacts', 'Duration']} />
             {rows.map((incident) => (
               <TableRow key={incident.id} onClick={() => navigate(`/incidents/${incident.id}`)}>
                 <span><StatusBadge status={incident.severity} /></span>
                 <span>{incident.service || '-'}</span>
                 <span className="truncate" title={incident.hypothesis || ''}>{truncate(incident.hypothesis)}</span>
-                <span>{incident.status}</span>
-                <span>{incident.jira_ticket_id || '-'}</span>
-                <span>{formatTime(incident.detected_at)}</span>
+                <span>{incident.confidence ?? 0}%</span>
+                <span><StatusBadge status={incident.status} /></span>
+                <span className="artifact-mini">{artifactBadges(incident).map(([label]) => label).join(', ') || 'Evidence pending'}</span>
+                <span>{durationText(incident)}</span>
               </TableRow>
             ))}
           </DataTable>
@@ -88,4 +90,9 @@ function formatTime(value) {
   if (Number.isFinite(minutes) && minutes < 60) return `${Math.max(0, minutes)} minutes ago`;
   if (Number.isFinite(minutes) && minutes < 1440) return `${Math.round(minutes / 60)} hours ago`;
   return new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function rankIncident(incident) {
+  const severity = { 'SEV-1': 40, 'SEV-2': 30, 'SEV-3': 20 };
+  return (incident.status === 'open' ? 100 : 0) + (severity[incident.severity] || 0) + (incident.confidence || 0) / 100;
 }

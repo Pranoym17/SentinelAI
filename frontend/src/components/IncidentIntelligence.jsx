@@ -1,57 +1,45 @@
+import { engineerBrief, managerBrief, latestEvent, formatDateTime } from './incidentStory.js';
 import { EmptyState, Panel, SectionHeader, StatusBadge } from './ui.jsx';
 
-export function BriefsPanel({ timeline = [] }) {
-  const event = latestEvent(timeline, 'communication_briefs_generated');
-  const engineer = event?.metadata?.engineer_brief;
-  const manager = event?.metadata?.manager_brief;
-
+export function BriefsPanel({ incident, timeline = [] }) {
   return (
     <Panel>
-      <SectionHeader title="Slack briefs" meta="Engineer and manager variants" />
-      {!engineer && !manager ? (
-        <EmptyState title="◎ No briefs generated" copy="Briefs are generated when the response agent coordinates Slack updates." />
-      ) : (
-        <div className="brief-grid">
-          <Brief title="Engineer brief" copy={engineer} />
-          <Brief title="Manager brief" copy={manager} />
-        </div>
-      )}
+      <SectionHeader title="Audience briefs" meta="Engineer and manager-ready status" />
+      <div className="brief-grid">
+        <Brief title="Engineer brief" copy={engineerBrief(incident, timeline)} />
+        <Brief title="Manager brief" copy={managerBrief(incident, timeline)} />
+      </div>
     </Panel>
   );
 }
 
 export function GitHubEvidencePanel({ incident }) {
+  const timeline = incident?.timeline || [];
   const preview = incident?.fix_preview;
   const pr = incident?.github_pr;
-  const commitLines = (incident?.reasoning_chain || []).filter((line) => {
-    const text = typeof line === 'string' ? line : `${line.step || ''} ${line.detail || ''}`;
-    return /commit|sha|github|changed file/i.test(text);
-  });
+  const evidence = collectEvidence(incident);
 
   return (
     <Panel>
       <SectionHeader
         title="GitHub evidence"
-        meta={preview?.repo || 'Commit correlation'}
+        meta={preview?.repo || pr?.repo || 'Commit correlation'}
         action={pr ? <StatusBadge status="PR opened" /> : preview ? <StatusBadge status="previewed" /> : null}
       />
-      {!preview && commitLines.length === 0 ? (
-        <EmptyState title="◎ No GitHub evidence yet" copy="Recent commits and fix evidence appear after GitHub is configured for the service." />
+      {evidence.length === 0 ? (
+        <EmptyState title="No GitHub evidence yet" copy="Commit correlation and proposed files appear once GitHub data is available for this service." />
       ) : (
         <div className="evidence-list">
-          {commitLines.map((line, index) => (
-            <EvidenceLine line={line} key={index} />
-          ))}
-          {(preview?.files || []).map((file) => (
-            <div className="evidence-item" key={file.path || file.proposed_change}>
-              <code>{file.path || 'unknown file'}</code>
-              <span>{file.before_risk || file.proposed_change || 'File selected for review.'}</span>
+          {evidence.map((item, index) => (
+            <div className="evidence-item" key={`${item.label}-${index}`}>
+              <code>{item.label}</code>
+              {item.href ? <a href={item.href} target="_blank" rel="noreferrer">{item.value}</a> : <span>{item.value}</span>}
             </div>
           ))}
-          {pr?.url && (
+          {latestEvent(timeline, 'github_fix_preview_generated') && (
             <div className="evidence-item">
-              <code>pull request</code>
-              <a href={pr.url} target="_blank" rel="noreferrer">{pr.title || pr.url}</a>
+              <code>artifact</code>
+              <span>Fix preview generated from incident context and recent commits.</span>
             </div>
           )}
         </div>
@@ -66,9 +54,9 @@ export function FollowupsPanel({ timeline = [] }) {
 
   return (
     <Panel>
-      <SectionHeader title="Jira follow-ups" meta="Post-mortem action items" />
+      <SectionHeader title="Prevention follow-ups" meta="Jira tasks created after resolution" />
       {items.length === 0 ? (
-        <EmptyState title="≡ No follow-ups yet" copy="Jira follow-up tasks are created after a resolved incident has a post-mortem." />
+        <EmptyState title="No prevention tasks yet" copy="Follow-up work is created after the post-mortem identifies prevention items." />
       ) : (
         <div className="followup-list">
           {items.map((item, index) => (
@@ -90,21 +78,33 @@ function Brief({ title, copy }) {
   return (
     <div className="brief-card">
       <strong>{title}</strong>
-      <p>{copy || 'No brief available.'}</p>
+      <p>{copy || 'Brief will appear after response coordination.'}</p>
     </div>
   );
 }
 
-function EvidenceLine({ line }) {
-  const text = typeof line === 'string' ? line : `${line.step ? `[${line.step}] ` : ''}${line.detail || ''}`;
-  return (
-    <div className="evidence-item">
-      <code>reasoning</code>
-      <span>{text}</span>
-    </div>
-  );
-}
-
-function latestEvent(timeline, type) {
-  return [...(timeline || [])].reverse().find((event) => event.event_type === type);
+function collectEvidence(incident) {
+  if (!incident) return [];
+  const items = [];
+  const preview = incident.fix_preview || {};
+  const pr = incident.github_pr || {};
+  if (preview.repo || pr.repo) items.push({ label: 'repo', value: preview.repo || pr.repo });
+  if (pr.branch) items.push({ label: 'branch', value: pr.branch });
+  if (pr.commit_sha) items.push({ label: 'commit', value: pr.commit_sha });
+  if (pr.url) items.push({ label: 'pull request', value: pr.title || pr.url, href: pr.url });
+  (preview.files || []).forEach((file) => {
+    items.push({
+      label: file.path || 'file',
+      value: file.before_risk || file.proposed_change || 'Selected for remediation review.',
+    });
+  });
+  (incident.reasoning_chain || []).forEach((line) => {
+    const text = typeof line === 'string' ? line : `${line.step || ''} ${line.detail || ''}`;
+    if (/commit|sha|github|changed file|deploy/i.test(text)) {
+      items.push({ label: 'reasoning', value: text });
+    }
+  });
+  const prEvent = latestEvent(incident.timeline || [], 'github_pr_created');
+  if (prEvent?.occurred_at) items.push({ label: 'created', value: formatDateTime(prEvent.occurred_at) });
+  return items;
 }

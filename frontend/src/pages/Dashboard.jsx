@@ -12,15 +12,8 @@ import MetricsPanel from '../components/MetricsPanel.jsx';
 import PostMortemViewer from '../components/PostMortemViewer.jsx';
 import RollbackTerminal from '../components/RollbackTerminal.jsx';
 import TimelineFeed from '../components/TimelineFeed.jsx';
-import { MetricCell, Panel, SkeletonRows, StatusBadge, StatusDot } from '../components/ui.jsx';
-
-const pipelineSteps = [
-  { key: 'detection', label: 'Detection' },
-  { key: 'investigation_completed', label: 'Investigation' },
-  { key: 'jira_created', label: 'Jira' },
-  { key: 'slack_sent', label: 'Slack' },
-  { key: 'rollback_completed', label: 'Rollback' },
-];
+import { artifactBadges, currentStage, nextAction } from '../components/incidentStory.js';
+import { Button, MetricCell, Panel, SkeletonRows, StatusBadge, StatusDot } from '../components/ui.jsx';
 
 export default function Dashboard() {
   const [state, setState] = useState(null);
@@ -30,6 +23,7 @@ export default function Dashboard() {
   const [postMortem, setPostMortem] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [demoBusy, setDemoBusy] = useState(false);
   const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
 
@@ -86,16 +80,27 @@ export default function Dashboard() {
     setPostMortem(detail.post_mortem || '');
   }
 
+  async function triggerDemoIncident() {
+    setDemoBusy(true);
+    setError('');
+    try {
+      await api.triggerDemo(1);
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDemoBusy(false);
+    }
+  }
+
   const countdown = state?.worker?.payment_spike_at
     ? Math.max(0, Math.ceil((new Date(state.worker.payment_spike_at).getTime() - now) / 1000))
     : null;
   const activeTimeline = incident?.timeline || state?.timeline || [];
   const slaWarning = activeTimeline.find((event) => event.event_type === 'sla_warning');
-  const correlation = activeTimeline.find((event) => event.event_type === 'correlation_detected');
-  const agentStep = activeTimeline.findLast?.((event) =>
-    ['detection', 'investigation_completed', 'jira_created', 'slack_sent', 'rollback_completed'].includes(event.event_type),
-  );
   const oncallAssigned = activeTimeline.some((event) => event.event_type === 'oncall_identified');
+  const stage = currentStage(incident, activeTimeline);
+  const watchedServices = new Set((state?.metrics || []).map((metric) => metric.service)).size;
 
   return (
     <main className="dashboard-shell">
@@ -107,25 +112,30 @@ export default function Dashboard() {
       </header>
 
       {error && <div className="notice">{error}</div>}
-      <Panel className="compact">
-        <div className="pipeline-row">
-          <div className="pipeline-stepper">
-            {pipelineSteps.map((step, index) => {
-              const complete = activeTimeline.some((event) => event.event_type === step.key);
-              return (
-                <div className={`pipeline-step ${complete ? 'complete' : ''}`} key={step.key}>
-                  <span className="pipeline-node">{index + 1}</span>
-                  <span>{step.label}</span>
-                </div>
-              );
-            })}
-          </div>
-          <span className="label pipeline-meta">
-            {countdown ? `Detection armed: ${countdown}s` : agentStep ? `Latest: ${agentStep.event_type.replaceAll('_', ' ')}` : 'Agent is watching'}
-          </span>
+      <Panel className={`command-center ${incident ? 'incident-active' : ''}`}>
+        <div className="command-copy">
+          <span className="label">{incident ? 'Incident command mode' : 'Calm monitoring mode'}</span>
+          <h2>{incident ? `${incident.severity} on ${incident.service}` : 'All systems monitored'}</h2>
+          <p>{incident ? incident.hypothesis || 'Agent investigation is building a hypothesis.' : 'SentinelAI is watching service metrics, deploy history, integrations, and incident memory for the next signal.'}</p>
+        </div>
+        <div className="command-next">
+          <span className={`status-badge ${incident ? 'warning' : 'healthy'}`}>{stage?.label || 'Monitoring'}</span>
+          <strong>{nextAction(incident, activeTimeline)}</strong>
+          <small>{countdown ? `Demo detection armed in ${countdown}s` : incident ? `${artifactBadges(incident, activeTimeline).length} response artifacts captured` : `${watchedServices || 3} services watched by the worker`}</small>
+          {!incident && (
+            <Button size="sm" loading={demoBusy} onClick={triggerDemoIncident}>
+              Trigger demo incident
+            </Button>
+          )}
+        </div>
+        <div className="proof-grid">
+          <Proof label="Worker loop" value={state?.worker?.running ? 'monitoring' : 'ready'} />
+          <Proof label="Z-score signals" value={`${state?.metrics?.length || 0} live metrics`} />
+          <Proof label="Deploy evidence" value={`${state?.recent_deploys?.length || 0} deploys`} />
+          <Proof label="Integrations" value={integrationCount(state?.integrations)} />
         </div>
       </Panel>
-      <CommanderStrip timeline={activeTimeline} />
+      <CommanderStrip incident={incident} timeline={activeTimeline} />
 
       <section className="stats-row">
         <MetricCell label="System health" value={incident ? '68' : '94'} status={incident ? 'warning' : 'healthy'} />
@@ -142,14 +152,14 @@ export default function Dashboard() {
           <IntegrationStatus integrations={state?.integrations || {}} />
         </aside>
         <section className="stack">
-          <MetricChart history={history} deploys={state?.recent_deploys || []} />
-          <TimelineFeed timeline={activeTimeline} />
           <IncidentCommandPanel
             incident={incident}
             onRefresh={refresh}
             onResolved={(markdown) => setPostMortem(markdown)}
           />
           {incident && <FixPreviewPanel incident={incident} onRefresh={refresh} compact />}
+          <MetricChart history={history} deploys={state?.recent_deploys || []} />
+          <TimelineFeed timeline={activeTimeline} />
           <PostMortemViewer incident={incident} markdown={postMortem} />
         </section>
       </div>
@@ -168,4 +178,18 @@ export default function Dashboard() {
       </div>
     </main>
   );
+}
+
+function Proof({ label, value }) {
+  return (
+    <div className="proof-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function integrationCount(integrations = {}) {
+  const count = Object.values(integrations || {}).filter((item) => item?.configured).length;
+  return `${count}/4 connected`;
 }

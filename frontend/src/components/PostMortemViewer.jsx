@@ -1,4 +1,4 @@
-import { Button, Panel, SectionHeader } from './ui.jsx';
+import { Button, EmptyState, Panel, SectionHeader } from './ui.jsx';
 
 export default function PostMortemViewer({ incident, markdown }) {
   const content = markdown || incident?.post_mortem || '';
@@ -13,11 +13,21 @@ export default function PostMortemViewer({ incident, markdown }) {
     URL.revokeObjectURL(url);
   }
 
-  if (!content) return null;
+  if (!content) {
+    return (
+      <Panel>
+        <SectionHeader title="Post-mortem" meta="Resolution record" />
+        <EmptyState
+          title="Post-mortem will be generated after resolution"
+          copy="SentinelAI uses the captured timeline, actions, evidence, and resolution summary to create the incident record."
+        />
+      </Panel>
+    );
+  }
 
   return (
     <Panel>
-      <SectionHeader title="Post-mortem" action={<Button size="sm" onClick={download}>Download markdown</Button>} />
+      <SectionHeader title="Post-mortem" meta="Automatically generated incident record" action={<Button size="sm" onClick={download}>Download markdown</Button>} />
       <pre className="markdown-preview">{content}</pre>
     </Panel>
   );

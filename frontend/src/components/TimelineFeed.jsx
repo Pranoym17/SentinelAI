@@ -1,11 +1,12 @@
-import { Panel, SectionHeader, StatusDot } from './ui.jsx';
+import { agentName, eventLabel, eventTone, formatDateTime } from './incidentStory.js';
+import { Panel, SectionHeader, StatusBadge, StatusDot } from './ui.jsx';
 
 export default function TimelineFeed({ timeline }) {
   const events = [...(timeline || [])].reverse().slice(0, 50);
   return (
     <Panel className="compact">
-      <SectionHeader title="Activity feed" meta={`${events.length} events`} />
-      <div className="activity-list">
+      <SectionHeader title="Agent timeline" meta={`${events.length} captured events`} />
+      <div className="activity-list timeline-list">
         {events.length === 0 && (
           <div className="activity-empty-box">
             <StatusDot status="healthy" />
@@ -13,10 +14,16 @@ export default function TimelineFeed({ timeline }) {
           </div>
         )}
         {events.map((event) => (
-          <div className="activity-item" key={event.id || `${event.event_type}-${event.occurred_at}`}>
-            <time>{event.occurred_at ? new Date(event.occurred_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</time>
-            <b>{event.event_type}</b>
-            <span>{event.description}</span>
+          <div className={`activity-item timeline-item ${eventTone(event)}`} key={event.id || `${event.event_type}-${event.occurred_at}`}>
+            <time>{event.occurred_at ? formatDateTime(event.occurred_at) : 'Pending'}</time>
+            <div className="timeline-kind">
+              <StatusBadge status={eventTone(event)} />
+              <b>{eventLabel(event.event_type)}</b>
+            </div>
+            <div>
+              <strong>{agentName(event)}</strong>
+              <span>{event.description || 'Agent event captured.'}</span>
+            </div>
           </div>
         ))}
       </div>

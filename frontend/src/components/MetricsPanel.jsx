@@ -3,9 +3,9 @@ import { EmptyState, Panel, SectionHeader, StatusBadge } from './ui.jsx';
 export default function MetricsPanel({ metrics }) {
   return (
     <Panel>
-      <SectionHeader title="Watched services" meta={`${metrics.length} configured`} />
+      <SectionHeader title="Watched services" meta={`${metrics.length} live worker feeds`} />
       {metrics.length === 0 ? (
-        <EmptyState title="◎ Monitoring active — no metrics yet" copy="Service readings appear here after the worker records its first metric snapshot." />
+        <EmptyState title="Monitoring active - no metrics yet" copy="Service readings appear here after the worker records its first metric snapshot." />
       ) : (
         <div className="service-grid">
           {metrics.map((service) => {
@@ -15,7 +15,7 @@ export default function MetricsPanel({ metrics }) {
                 <div className="service-card-head">
                   <div>
                     <h3>{service.service}</h3>
-                    <small className="muted">live worker feed</small>
+                    <small className="muted">z-score anomaly feed</small>
                   </div>
                   <StatusBadge status={status} />
                 </div>

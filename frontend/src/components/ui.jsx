@@ -160,7 +160,8 @@ export function TableRow({ children, onClick }) {
 function statusClass(status) {
   const value = String(status || '').toLowerCase();
   if (value.includes('sev-1') || value.includes('critical') || value === 'open' || value.includes('breach')) return 'critical';
-  if (value.includes('sev-2') || value.includes('warning') || value.includes('risk') || value.includes('degraded')) return 'warning';
-  if (value.includes('sev-3') || value.includes('healthy') || value.includes('resolved') || value.includes('ok')) return 'healthy';
+  if (value.includes('sev-2') || value.includes('warning') || value.includes('risk') || value.includes('degraded') || value.includes('running')) return 'warning';
+  if (value.includes('sev-3') || value.includes('healthy') || value.includes('resolved') || value.includes('ok') || value.includes('completed') || value.includes('created') || value.includes('opened')) return 'healthy';
+  if (value.includes('failed')) return 'critical';
   return 'neutral';
 }
