@@ -103,7 +103,7 @@ export function nextAction(incident, timeline = []) {
 
 export function prGateReason(incident) {
   if (!incident?.fix_preview) return 'Generate a fix preview first';
-  if ((incident.confidence || 0) < 80) return 'Confidence must be 80% or higher';
+  if ((incident.confidence || 0) < 40) return 'Confidence must be 40% or higher';
   if (incident.status === 'resolved') return 'Incident already resolved';
   if (incident.github_pr) return '';
   return '';

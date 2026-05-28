@@ -110,10 +110,24 @@ def test_github_pr_blocks_low_confidence(client, monkeypatch):
     monkeypatch.setenv("GITHUB_PR_ENABLED", "true")
     db = SessionLocal()
     try:
-        incident = add_incident(db, confidence=55)
+        incident = add_incident(db, confidence=39)
         result = GitHubPRService(db, github=FakeGitHub()).create_pr(incident)
         assert result["status"] == "blocked"
-        assert "high-confidence" in result["reason"]
+        assert "40%" in result["reason"]
+    finally:
+        db.close()
+
+
+def test_github_pr_allows_confidence_at_40(client, monkeypatch):
+    from app.database import SessionLocal
+
+    monkeypatch.setenv("GITHUB_PR_ENABLED", "true")
+    db = SessionLocal()
+    try:
+        incident = add_incident(db, confidence=40)
+        result = GitHubPRService(db, github=FakeGitHub()).create_pr(incident)
+
+        assert result["status"] == "created"
     finally:
         db.close()
 
@@ -130,5 +144,25 @@ def test_github_pr_endpoint_returns_existing_pr(client):
         assert response.status_code == 200
         assert response.json()["status"] == "existing"
         assert response.json()["github_pr"]["number"] == 8
+    finally:
+        db.close()
+
+
+def test_github_pr_endpoint_allows_confidence_at_40(client, monkeypatch):
+    from app.database import SessionLocal
+    from app.services import github_pr_service
+
+    monkeypatch.setenv("GITHUB_PR_ENABLED", "true")
+    monkeypatch.setattr(github_pr_service, "GitHubService", lambda db: FakeGitHub())
+    db = SessionLocal()
+    try:
+        incident = add_incident(db, confidence=40)
+
+        response = client.post(f"/api/incidents/{incident.id}/github-pr")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "created"
+        assert body["github_pr"]["number"] == 7
     finally:
         db.close()

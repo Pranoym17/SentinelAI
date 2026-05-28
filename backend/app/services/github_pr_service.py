@@ -28,8 +28,8 @@ class GitHubPRService:
             return {"status": "disabled", "reason": "GITHUB_PR_ENABLED is not true"}
         if not self.github.configured:
             return {"status": "skipped", "reason": "GitHub token is not configured"}
-        if incident.confidence is not None and incident.confidence < 80:
-            return {"status": "blocked", "reason": "GitHub PR requires high-confidence incident"}
+        if incident.confidence is not None and incident.confidence < 40:
+            return {"status": "blocked", "reason": "GitHub PR requires confidence of at least 40%"}
 
         if not incident.fix_preview:
             preview_result = FixPreviewService(self.db).generate(incident)

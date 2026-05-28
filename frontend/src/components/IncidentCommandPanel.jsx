@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { api } from '../api.js';
 import { artifactBadges, nextAction } from './incidentStory.js';
@@ -11,6 +11,12 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
   const [blastRadius, setBlastRadius] = useState(null);
   const [busy, setBusy] = useState('');
   const [feedback, setFeedback] = useState('');
+
+  useEffect(() => {
+    if (incident) {
+      setResolution(defaultResolution(incident));
+    }
+  }, [incident?.incident_id]);
 
   if (!incident) {
     return (
@@ -154,6 +160,17 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
       )}
     </Panel>
   );
+}
+
+function defaultResolution(incident) {
+  const service = incident?.service;
+  if (service === 'auth') {
+    return 'Rolled back auth-service to v1.17.4 and restored session cache TTL';
+  }
+  if (service === 'api-gateway') {
+    return 'Rolled back api-gateway to v3.9.1 and disabled aggressive upstream retries';
+  }
+  return 'Rolled back payments-api to v2.4.0';
 }
 
 function Info({ title, children }) {

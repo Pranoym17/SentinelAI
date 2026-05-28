@@ -2,7 +2,19 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.models import Config, HealthCheck, HistoricalIncident, Incident, MetricSnapshot, RecentDeploy, TimelineEvent
+from app.models import (
+    Config,
+    HealthCheck,
+    HistoricalIncident,
+    Incident,
+    MetricSnapshot,
+    OnCallSchedule,
+    RecentDeploy,
+    RunbookLibrary,
+    Service,
+    SLARecord,
+    TimelineEvent,
+)
 from app.services.deploy_service import DeployService
 from app.services.integration_service import IntegrationService
 from app.services.metrics_service import MetricsService
@@ -15,7 +27,18 @@ class DemoService:
         self.db = db
 
     def reset(self, keep_config: bool = True) -> dict:
-        for model in [TimelineEvent, Incident, MetricSnapshot, HealthCheck, HistoricalIncident, RecentDeploy]:
+        for model in [
+            TimelineEvent,
+            Incident,
+            MetricSnapshot,
+            HealthCheck,
+            HistoricalIncident,
+            RecentDeploy,
+            SLARecord,
+            RunbookLibrary,
+            OnCallSchedule,
+            Service,
+        ]:
             self.db.query(model).delete()
         if not keep_config:
             self.db.query(Config).delete()
@@ -45,6 +68,9 @@ class DemoService:
         )
         self.db.add(config)
         self.seed_basics()
+        self._seed_service_catalog()
+        self._seed_oncall()
+        self._seed_runbooks()
 
         self.db.add(
             RecentDeploy(
@@ -53,6 +79,24 @@ class DemoService:
                 author="devops",
                 deployed_at=utc_now() - timedelta(minutes=14),
                 changes_summary="Updated payments SDK to v3.2.0",
+            )
+        )
+        self.db.add(
+            RecentDeploy(
+                service="auth-service",
+                version="v1.18.0",
+                author="identity-team",
+                deployed_at=utc_now() - timedelta(minutes=22),
+                changes_summary="Changed session validation cache and token introspection timeout",
+            )
+        )
+        self.db.add(
+            RecentDeploy(
+                service="api-gateway",
+                version="v3.9.2",
+                author="platform",
+                deployed_at=utc_now() - timedelta(minutes=36),
+                changes_summary="Updated route matching middleware and upstream retry defaults",
             )
         )
         self.db.add(
@@ -65,8 +109,184 @@ class DemoService:
                 occurred_at=datetime(2026, 3, 3, 14, 0, 0),
             )
         )
+        self.db.add(
+            HistoricalIncident(
+                service="auth",
+                signal_type="latency_spike",
+                root_cause="Token introspection calls saturated after cache policy change",
+                resolution="Restored cache TTL and raised connection pool limits",
+                duration_minutes=21,
+                occurred_at=datetime(2026, 2, 18, 16, 30, 0),
+            )
+        )
+        self.db.add(
+            HistoricalIncident(
+                service="api-gateway",
+                signal_type="error_spike",
+                root_cause="Gateway retry middleware amplified upstream 500 responses",
+                resolution="Disabled aggressive retry policy and patched route matcher",
+                duration_minutes=27,
+                occurred_at=datetime(2026, 4, 9, 11, 15, 0),
+            )
+        )
         self.db.commit()
         return {"status": "seeded", "config_id": config.id}
+
+    def _seed_service_catalog(self) -> None:
+        services = [
+            Service(
+                name="payments",
+                display_name="Payments API",
+                description="Authorizes checkout payments and provider responses.",
+                dependencies=["auth", "database", "redis", "message-queue"],
+                team="payments-team",
+                repo_url="Pranoym17/payments-api-demo",
+                sla_target=99.99,
+            ),
+            Service(
+                name="auth",
+                display_name="Auth Service",
+                description="Handles login, sessions, token validation, and identity cache.",
+                dependencies=["database", "redis"],
+                team="identity-team",
+                repo_url="Pranoym17/payments-api-demo",
+                sla_target=99.95,
+            ),
+            Service(
+                name="api-gateway",
+                display_name="API Gateway",
+                description="Routes public API traffic to downstream platform services.",
+                dependencies=["auth", "payments", "redis"],
+                team="platform",
+                repo_url="Pranoym17/payments-api-demo",
+                sla_target=99.99,
+            ),
+            Service(
+                name="checkout-web",
+                display_name="Checkout Web",
+                description="Customer checkout frontend that depends on payments and auth.",
+                dependencies=["payments", "auth", "api-gateway"],
+                team="web-platform",
+                repo_url="Pranoym17/payments-api-demo",
+                sla_target=99.9,
+            ),
+            Service(
+                name="billing-worker",
+                display_name="Billing Worker",
+                description="Async billing jobs that consume payment events.",
+                dependencies=["payments", "message-queue"],
+                team="payments-team",
+                repo_url="Pranoym17/payments-api-demo",
+                sla_target=99.9,
+            ),
+        ]
+        self.db.add_all(services)
+
+        month = utc_now().strftime("%Y-%m")
+        self.db.add_all(
+            [
+                SLARecord(
+                    service="payments",
+                    month=month,
+                    target_uptime=99.99,
+                    actual_uptime=99.995,
+                    total_downtime_minutes=2,
+                    incident_count=1,
+                    sla_breached=False,
+                ),
+                SLARecord(
+                    service="auth",
+                    month=month,
+                    target_uptime=99.95,
+                    actual_uptime=99.98,
+                    total_downtime_minutes=8,
+                    incident_count=1,
+                    sla_breached=False,
+                ),
+                SLARecord(
+                    service="api-gateway",
+                    month=month,
+                    target_uptime=99.99,
+                    actual_uptime=99.996,
+                    total_downtime_minutes=1,
+                    incident_count=1,
+                    sla_breached=False,
+                ),
+            ]
+        )
+
+    def _seed_oncall(self) -> None:
+        now = utc_now()
+        self.db.add_all(
+            [
+                OnCallSchedule(
+                    engineer_name="Maya Chen",
+                    engineer_email="maya@example.com",
+                    slack_handle="@maya",
+                    team="payments",
+                    start_time=now - timedelta(hours=2),
+                    end_time=now + timedelta(hours=10),
+                ),
+                OnCallSchedule(
+                    engineer_name="Noah Patel",
+                    engineer_email="noah@example.com",
+                    slack_handle="@noah",
+                    team="auth",
+                    start_time=now - timedelta(hours=2),
+                    end_time=now + timedelta(hours=10),
+                ),
+                OnCallSchedule(
+                    engineer_name="Avery Smith",
+                    engineer_email="avery@example.com",
+                    slack_handle="@avery",
+                    team="api-gateway",
+                    start_time=now - timedelta(hours=2),
+                    end_time=now + timedelta(hours=10),
+                ),
+            ]
+        )
+
+    def _seed_runbooks(self) -> None:
+        self.db.add_all(
+            [
+                RunbookLibrary(
+                    service="payments",
+                    signal_type="error_spike",
+                    title="Payments checkout error response",
+                    steps=[
+                        "Inspect recent payments-api deploy and SDK response parsing changes",
+                        "Verify provider authorization response shape",
+                        "Rollback payments-api if checkout errors remain elevated",
+                    ],
+                    times_used=4,
+                    times_successful=3,
+                ),
+                RunbookLibrary(
+                    service="auth",
+                    signal_type="latency_spike",
+                    title="Auth latency and token cache response",
+                    steps=[
+                        "Check token introspection latency and identity cache hit rate",
+                        "Restore previous session cache TTL if login latency remains high",
+                        "Validate login p95 latency returns below threshold",
+                    ],
+                    times_used=3,
+                    times_successful=3,
+                ),
+                RunbookLibrary(
+                    service="api-gateway",
+                    signal_type="error_spike",
+                    title="Gateway routing error response",
+                    steps=[
+                        "Inspect recent route matcher and retry policy changes",
+                        "Disable aggressive upstream retry rules if errors amplify",
+                        "Confirm gateway 5xx rate and downstream health normalize",
+                    ],
+                    times_used=2,
+                    times_successful=2,
+                ),
+            ]
+        )
 
     def state(self) -> dict:
         from app.background_worker import worker

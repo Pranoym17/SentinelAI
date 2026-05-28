@@ -15,6 +15,12 @@ import TimelineFeed from '../components/TimelineFeed.jsx';
 import { artifactBadges, currentStage, nextAction } from '../components/incidentStory.js';
 import { Button, MetricCell, Panel, SkeletonRows, StatusBadge, StatusDot } from '../components/ui.jsx';
 
+const DEMO_SCENARIOS = [
+  { id: 'payments:error_spike', label: 'Payments error spike', service: 'payments', signalType: 'error_spike' },
+  { id: 'auth:latency_spike', label: 'Auth latency spike', service: 'auth', signalType: 'latency_spike' },
+  { id: 'api-gateway:error_spike', label: 'API gateway error spike', service: 'api-gateway', signalType: 'error_spike' },
+];
+
 export default function Dashboard() {
   const [state, setState] = useState(null);
   const [history, setHistory] = useState({});
@@ -24,6 +30,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [demoBusy, setDemoBusy] = useState(false);
+  const [demoScenarioId, setDemoScenarioId] = useState(DEMO_SCENARIOS[0].id);
   const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
 
@@ -81,10 +88,11 @@ export default function Dashboard() {
   }
 
   async function triggerDemoIncident() {
+    const scenario = DEMO_SCENARIOS.find((item) => item.id === demoScenarioId) || DEMO_SCENARIOS[0];
     setDemoBusy(true);
     setError('');
     try {
-      await api.triggerDemo(1);
+      await api.triggerDemo(1, scenario.service, scenario.signalType);
       await refresh();
     } catch (err) {
       setError(err.message);
@@ -93,8 +101,9 @@ export default function Dashboard() {
     }
   }
 
-  const countdown = state?.worker?.payment_spike_at
-    ? Math.max(0, Math.ceil((new Date(state.worker.payment_spike_at).getTime() - now) / 1000))
+  const scheduledSignal = state?.worker?.scheduled_signal;
+  const countdown = scheduledSignal?.spike_at
+    ? Math.max(0, Math.ceil((new Date(scheduledSignal.spike_at).getTime() - now) / 1000))
     : null;
   const activeTimeline = incident?.timeline || state?.timeline || [];
   const slaWarning = activeTimeline.find((event) => event.event_type === 'sla_warning');
@@ -121,11 +130,18 @@ export default function Dashboard() {
         <div className="command-next">
           <span className={`status-badge ${incident ? 'warning' : 'healthy'}`}>{stage?.label || 'Monitoring'}</span>
           <strong>{nextAction(incident, activeTimeline)}</strong>
-          <small>{countdown ? `Demo detection armed in ${countdown}s` : incident ? `${artifactBadges(incident, activeTimeline).length} response artifacts captured` : `${watchedServices || 3} services watched by the worker`}</small>
+          <small>{countdown ? `${scheduledSignal.service} ${scheduledSignal.type} armed in ${countdown}s` : incident ? `${artifactBadges(incident, activeTimeline).length} response artifacts captured` : `${watchedServices || 3} services watched by the worker`}</small>
           {!incident && (
-            <Button size="sm" loading={demoBusy} onClick={triggerDemoIncident}>
-              Trigger demo incident
-            </Button>
+            <div className="demo-trigger-control">
+              <select value={demoScenarioId} onChange={(event) => setDemoScenarioId(event.target.value)}>
+                {DEMO_SCENARIOS.map((scenario) => (
+                  <option value={scenario.id} key={scenario.id}>{scenario.label}</option>
+                ))}
+              </select>
+              <Button size="sm" loading={demoBusy} onClick={triggerDemoIncident}>
+                Trigger demo incident
+              </Button>
+            </div>
           )}
         </div>
         <div className="proof-grid">
@@ -158,7 +174,7 @@ export default function Dashboard() {
             onResolved={(markdown) => setPostMortem(markdown)}
           />
           {incident && <FixPreviewPanel incident={incident} onRefresh={refresh} compact />}
-          <MetricChart history={history} deploys={state?.recent_deploys || []} />
+          <MetricChart history={history} deploys={state?.recent_deploys || []} incident={incident} />
           <TimelineFeed timeline={activeTimeline} />
           <PostMortemViewer incident={incident} markdown={postMortem} />
         </section>

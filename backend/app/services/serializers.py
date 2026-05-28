@@ -45,6 +45,7 @@ def serialize_incident(incident: Incident, timeline: list[TimelineEvent] | None 
         "slack_message_ts": incident.slack_message_ts,
         "resolution_text": incident.resolution_text,
         "post_mortem": incident.post_mortem,
+        "matched_past_incident_id": incident.matched_past_incident_id,
         "detected_at": incident.detected_at.isoformat(),
         "resolved_at": incident.resolved_at.isoformat() if incident.resolved_at else None,
         "duration_minutes": incident.duration_minutes,

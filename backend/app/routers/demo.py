@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.background_worker import worker
@@ -20,8 +20,11 @@ def reset(keep_config: bool = True, db: Session = Depends(get_db)) -> dict:
 
 
 @router.post("/trigger")
-def trigger(delay_seconds: int = 30) -> dict:
-    return worker.schedule_payment_spike(delay_seconds=delay_seconds)
+def trigger(delay_seconds: int = 30, service: str = "payments", signal_type: str | None = None) -> dict:
+    try:
+        return worker.schedule_demo_signal(service=service, signal_type=signal_type, delay_seconds=delay_seconds)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/worker")

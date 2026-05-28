@@ -182,7 +182,7 @@ class ResponseAgent:
             )
             actions_taken.append("jira_assigned")
 
-        subtasks = self.jira.create_subtasks(incident, self._subtask_actions(recommended_actions))
+        subtasks = self.jira.create_subtasks(incident, self._subtask_actions(incident, recommended_actions))
         created_subtasks = [item for item in subtasks.get("subtasks", []) if item.get("created")]
         if created_subtasks:
             self.timeline.append(
@@ -224,12 +224,32 @@ class ResponseAgent:
             self.timeline.append(incident.id, "slack_thread_failed", result.get("reason", "Slack thread update failed"))
         return result
 
-    def _subtask_actions(self, recommended_actions: list[str]) -> list[str]:
-        defaults = [
-            "Verify customer-facing error rate is back below threshold",
-            "Confirm checkout success rate recovered",
-            "Update the incident runbook with confirmed resolution",
-        ]
+    def _subtask_actions(self, incident: Incident, recommended_actions: list[str]) -> list[str]:
+        defaults_by_service = {
+            "payments": [
+                "Verify customer-facing error rate is back below threshold",
+                "Confirm checkout success rate recovered",
+                "Update the payments incident runbook with confirmed resolution",
+            ],
+            "auth": [
+                "Verify login p95 latency is back below threshold",
+                "Confirm token introspection and session cache health recovered",
+                "Update the auth latency runbook with confirmed resolution",
+            ],
+            "api-gateway": [
+                "Verify gateway 5xx rate is back below threshold",
+                "Confirm route matching and upstream retry behavior recovered",
+                "Update the gateway incident runbook with confirmed resolution",
+            ],
+        }
+        defaults = defaults_by_service.get(
+            incident.service,
+            [
+                f"Verify {incident.service} telemetry is back below threshold",
+                f"Confirm {incident.service} customer impact has recovered",
+                "Update the incident runbook with confirmed resolution",
+            ],
+        )
         actions = [action for action in recommended_actions if action and not action.lower().startswith("sla warning")]
         for action in defaults:
             if action not in actions:

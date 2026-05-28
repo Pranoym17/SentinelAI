@@ -11,28 +11,33 @@ import {
 
 import { Panel, SectionHeader } from './ui.jsx';
 
-function formatHistory(history) {
-  const payments = history?.payments || [];
-  return payments
-    .filter((point) => point.metric_type === 'error_rate')
+function formatHistory(history, service, metricType) {
+  const points = history?.[service] || [];
+  return points
+    .filter((point) => point.metric_type === metricType)
     .slice(-60)
     .map((point) => ({
       time: new Date(point.recorded_at).toLocaleTimeString([], {
         minute: '2-digit',
         second: '2-digit',
       }),
-      error_rate: point.value,
+      value: point.value,
     }));
 }
 
-export default function MetricChart({ history, deploys }) {
-  const data = formatHistory(history);
+export default function MetricChart({ history, deploys, incident }) {
+  const service = incident?.service || 'payments';
+  const metricType = incident?.signal_type === 'latency_spike' ? 'latency_ms' : 'error_rate';
+  const data = formatHistory(history, service, metricType);
   const suspected = (deploys || []).find((deploy) => deploy.suspected_cause);
+  const baseline = metricType === 'latency_ms' ? 150 : 0.2;
+  const threshold = metricType === 'latency_ms' ? 2000 : 5;
+  const label = metricType === 'latency_ms' ? 'latency' : 'error rate';
 
   return (
     <Panel>
       <SectionHeader
-        title="Payments error rate"
+        title={`${service} ${label}`}
         meta={suspected ? `Suspected deploy: ${suspected.version}` : 'Last 60 readings'}
       />
       <div className="chart-wrap">
@@ -45,11 +50,11 @@ export default function MetricChart({ history, deploys }) {
               contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8 }}
               labelStyle={{ color: 'var(--text-primary)' }}
             />
-            <ReferenceLine y={0.2} stroke="var(--healthy)" strokeDasharray="4 4" label="baseline" />
-            <ReferenceLine y={5} stroke="var(--warning)" strokeDasharray="4 4" label="threshold" />
+            <ReferenceLine y={baseline} stroke="var(--healthy)" strokeDasharray="4 4" label="baseline" />
+            <ReferenceLine y={threshold} stroke="var(--warning)" strokeDasharray="4 4" label="threshold" />
             <Line
               type="monotone"
-              dataKey="error_rate"
+              dataKey="value"
               stroke="var(--critical)"
               strokeWidth={3}
               dot={false}

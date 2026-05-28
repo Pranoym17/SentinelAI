@@ -12,6 +12,34 @@ from app.schemas import SignalIn
 from app.time_utils import utc_now
 
 
+DEMO_SCENARIOS = {
+    "payments": {
+        "service": "payments",
+        "type": "error_spike",
+        "value": 18.0,
+        "baseline": 0.2,
+        "unit": "percent",
+        "metric_type": "error_rate",
+    },
+    "auth": {
+        "service": "auth",
+        "type": "latency_spike",
+        "value": 3200.0,
+        "baseline": 150.0,
+        "unit": "ms",
+        "metric_type": "latency_ms",
+    },
+    "api-gateway": {
+        "service": "api-gateway",
+        "type": "error_spike",
+        "value": 8.5,
+        "baseline": 0.3,
+        "unit": "percent",
+        "metric_type": "error_rate",
+    },
+}
+
+
 class BackgroundWorker:
     def __init__(self, poll_seconds: int = 5, window_size: int = 20, z_threshold: float = 3.0):
         self.poll_seconds = poll_seconds
@@ -21,7 +49,7 @@ class BackgroundWorker:
         self._thread = None
         self._stop = threading.Event()
         self._lock = threading.Lock()
-        self._payment_spike_at: datetime | None = None
+        self._scheduled_signal: dict | None = None
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -33,20 +61,49 @@ class BackgroundWorker:
         self._stop.set()
 
     def schedule_payment_spike(self, delay_seconds: int = 30) -> dict:
+        return self.schedule_demo_signal("payments", "error_spike", delay_seconds=delay_seconds)
+
+    def schedule_demo_signal(
+        self,
+        service: str = "payments",
+        signal_type: str | None = None,
+        delay_seconds: int = 30,
+    ) -> dict:
+        scenario = DEMO_SCENARIOS.get(service)
+        if not scenario:
+            raise ValueError(f"Unknown demo service: {service}")
+        if signal_type and scenario["type"] != signal_type:
+            matches = [item for item in DEMO_SCENARIOS.values() if item["service"] == service and item["type"] == signal_type]
+            if not matches:
+                raise ValueError(f"Unknown demo scenario: {service}/{signal_type}")
+            scenario = matches[0]
         with self._lock:
-            self._payment_spike_at = utc_now() + timedelta(seconds=delay_seconds)
-            spike_at = self._payment_spike_at.isoformat()
-        return {"status": "scheduled", "service": "payments", "spike_at": spike_at}
+            spike_at = utc_now() + timedelta(seconds=delay_seconds)
+            self._scheduled_signal = {**scenario, "spike_at": spike_at}
+        return {
+            "status": "scheduled",
+            "service": scenario["service"],
+            "signal_type": scenario["type"],
+            "spike_at": spike_at.isoformat(),
+        }
 
     def state(self) -> dict:
         with self._lock:
-            spike_at = self._payment_spike_at.isoformat() if self._payment_spike_at else None
+            scheduled = dict(self._scheduled_signal) if self._scheduled_signal else None
+            if scheduled and scheduled.get("spike_at"):
+                scheduled["spike_at"] = scheduled["spike_at"].isoformat()
+            payment_spike_at = (
+                scheduled["spike_at"]
+                if scheduled and scheduled.get("service") == "payments" and scheduled.get("type") == "error_spike"
+                else None
+            )
         return {
             "running": bool(self._thread and self._thread.is_alive()),
             "poll_seconds": self.poll_seconds,
             "window_size": self.window_size,
             "z_threshold": self.z_threshold,
-            "payment_spike_at": spike_at,
+            "payment_spike_at": payment_spike_at,
+            "scheduled_signal": scheduled,
         }
 
     def _run(self) -> None:
@@ -62,35 +119,48 @@ class BackgroundWorker:
                 return
 
             for service in config.services or ["payments", "auth", "api-gateway"]:
-                value = self._next_error_rate(service)
-                snapshot = MetricSnapshot(service=service, metric_type="error_rate", value=value, baseline=0.2)
-                db.add(snapshot)
-                db.commit()
-
-                key = (service, "error_rate")
-                window = self.windows[key]
-                z_score = compute_z_score(value, list(window))
-                window.append(value)
-
-                if z_score > self.z_threshold:
-                    signal = SignalIn(
+                for metric_type, baseline in [("error_rate", 0.2), ("latency_ms", 150.0)]:
+                    scenario = self._pop_due_signal(service, metric_type)
+                    value = scenario["value"] if scenario else baseline
+                    snapshot = MetricSnapshot(
                         service=service,
-                        type="error_spike",
+                        metric_type=metric_type,
                         value=value,
-                        baseline=0.2,
-                        unit="percent",
+                        baseline=scenario["baseline"] if scenario else baseline,
                     )
-                    IncidentOrchestrator(db).handle_signal(signal, config)
+                    db.add(snapshot)
+                    db.commit()
+
+                    key = (service, metric_type)
+                    window = self.windows[key]
+                    z_score = compute_z_score(value, list(window))
+                    window.append(value)
+
+                    if scenario or z_score > self.z_threshold:
+                        signal = SignalIn(
+                            service=service,
+                            type=scenario["type"] if scenario else "error_spike",
+                            value=value,
+                            baseline=scenario["baseline"] if scenario else baseline,
+                            unit=scenario["unit"] if scenario else ("percent" if metric_type == "error_rate" else "ms"),
+                        )
+                        IncidentOrchestrator(db).handle_signal(signal, config)
         finally:
             db.close()
 
-    def _next_error_rate(self, service: str) -> float:
+    def _pop_due_signal(self, service: str, metric_type: str) -> dict | None:
         with self._lock:
-            should_spike = service == "payments" and self._payment_spike_at and utc_now() >= self._payment_spike_at
+            scheduled = self._scheduled_signal
+            should_spike = (
+                scheduled
+                and scheduled["service"] == service
+                and scheduled["metric_type"] == metric_type
+                and utc_now() >= scheduled["spike_at"]
+            )
             if should_spike:
-                self._payment_spike_at = None
-                return 18.0
-        return 0.2
+                self._scheduled_signal = None
+                return scheduled
+        return None
 
 def compute_z_score(value: float, previous_values: list[float]) -> float:
     if len(previous_values) < 2:

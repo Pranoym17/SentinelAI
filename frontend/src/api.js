@@ -62,8 +62,11 @@ export const api = {
   fullSeed: () => request('/api/demo/full-seed', { method: 'POST' }),
   resetDemo: (keepConfig = true) =>
     request(`/api/demo/reset?keep_config=${keepConfig ? 'true' : 'false'}`, { method: 'POST' }),
-  triggerDemo: (delaySeconds = 30) =>
-    request(`/api/demo/trigger?delay_seconds=${delaySeconds}`, { method: 'POST' }),
+  triggerDemo: (delaySeconds = 30, service = 'payments', signalType = '') => {
+    const params = new URLSearchParams({ delay_seconds: String(delaySeconds), service });
+    if (signalType) params.set('signal_type', signalType);
+    return request(`/api/demo/trigger?${params.toString()}`, { method: 'POST' });
+  },
   seedDemo: () => request('/api/seed/demo', { method: 'POST' }),
   seedDeploys: (deploys) =>
     request('/api/seed/deploys', {

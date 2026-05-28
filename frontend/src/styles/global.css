@@ -403,6 +403,11 @@ h2 {
   font-weight: 500;
 }
 
+.demo-trigger-control {
+  display: grid;
+  gap: 8px;
+}
+
 .proof-grid {
   display: grid;
   gap: 8px;
