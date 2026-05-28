@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../api.js';
-import { EmptyState, MetricCell, Panel, SectionHeader } from '../components/ui.jsx';
+import { DataTable, EmptyState, MetricCell, Panel, SkeletonRows, TableHeader, TableRow, SectionHeader } from '../components/ui.jsx';
 
 export default function AnalyticsPage() {
   const [analytics, setAnalytics] = useState(null);
@@ -29,7 +29,7 @@ export default function AnalyticsPage() {
         </div>
       </div>
       {error && <div className="notice">{error}</div>}
-      {loading && <Panel><EmptyState title="Loading analytics" copy="Calculating reliability metrics." /></Panel>}
+      {loading && <Panel><SkeletonRows rows={4} /></Panel>}
       <div className="stats-row">
         <MetricCell label="MTTD" value={analytics?.mttd_seconds ?? 0} unit="s" />
         <MetricCell label="MTTR" value={analytics?.mttr_minutes ?? 0} unit="m" />
@@ -39,7 +39,7 @@ export default function AnalyticsPage() {
       </div>
       <Panel>
         <SectionHeader title="Incidents by service" />
-        {chartData.length === 0 ? <EmptyState title="No resolved incidents" copy="Resolve an incident to populate this chart." /> : <div className="chart-wrap small">
+        {chartData.length === 0 ? <EmptyState title="◎ Not enough data yet" copy="Analytics populate after your first resolved incident. The agent is monitoring. Check back soon." /> : <div className="chart-wrap small">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData}>
               <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
@@ -53,16 +53,17 @@ export default function AnalyticsPage() {
       </Panel>
       <Panel>
         <SectionHeader title="SLA status" />
-        {sla.length === 0 ? <EmptyState title="No SLA records" copy="Add services or resolve incidents to generate SLA records." /> : <div className="data-table">
+        {sla.length === 0 ? <EmptyState title="◎ Not enough SLA data yet" copy="SLA records appear after services are configured and incidents resolve." /> : <DataTable columns="1fr 120px 120px 120px">
+          <TableHeader cells={['Service', 'Target', 'Actual', 'Budget']} />
           {sla.map((row) => (
-            <div className="table-row" key={row.service}>
-              <span>{row.service}</span>
-              <span>{row.target_uptime}% target</span>
-              <span>{row.actual_uptime}% actual</span>
-              <span>{row.remaining_budget_minutes}m left</span>
-            </div>
+            <TableRow key={row.service}>
+              <span>{row.service || '—'}</span>
+              <span>{row.target_uptime}%</span>
+              <span>{row.actual_uptime}%</span>
+              <span>{row.remaining_budget_minutes}m</span>
+            </TableRow>
           ))}
-        </div>}
+        </DataTable>}
       </Panel>
     </main>
   );

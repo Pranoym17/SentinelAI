@@ -13,7 +13,7 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
   if (!incident) {
     return (
       <Panel>
-        <EmptyState title="No active incident" copy="Monitoring is active. Start the autonomous demo or inject a signal." />
+        <EmptyState title="◎ Monitoring active" copy="The agent is watching configured services. Incident controls appear here when an anomaly is detected." />
       </Panel>
     );
   }
@@ -73,9 +73,9 @@ export default function IncidentCommandPanel({ incident, onRefresh, onResolved }
 
       <div className="info-grid">
         <Info title="Jira">
-          {incident.jira_ticket_url ? <a href={incident.jira_ticket_url} target="_blank" rel="noreferrer">{incident.jira_ticket_id}</a> : 'Not created'}
+          {incident.jira_ticket_url ? <a href={incident.jira_ticket_url} target="_blank" rel="noreferrer">{incident.jira_ticket_id || 'View ticket'}</a> : '—'}
         </Info>
-        <Info title="Slack">{slackEvent?.description || 'No Slack event yet'}</Info>
+        <Info title="Slack">{slackEvent?.description || '—'}</Info>
         {oncallEvent && <Info title="On-call">{oncallEvent.description}</Info>}
         {runbookEvent && <Info title="Runbook">{runbookEvent.description}</Info>}
       </div>

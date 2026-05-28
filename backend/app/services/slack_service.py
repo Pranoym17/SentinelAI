@@ -16,11 +16,17 @@ class SlackService:
     def __init__(self, config: dict | None = None):
         config = config or {}
         self.webhook_url = config.get("webhook_url") or config.get("SLACK_WEBHOOK_URL") or os.getenv("SLACK_WEBHOOK_URL", "")
+        self.bot_token = config.get("bot_token") or config.get("SLACK_BOT_TOKEN") or os.getenv("SLACK_BOT_TOKEN", "")
         self.channel = config.get("channel") or config.get("SLACK_CHANNEL") or os.getenv("SLACK_CHANNEL", "#incidents")
+        self.dashboard_url = (
+            config.get("dashboard_url")
+            or config.get("SENTINEL_DASHBOARD_URL")
+            or os.getenv("SENTINEL_DASHBOARD_URL", "http://localhost:5174/dashboard")
+        )
 
     @property
     def configured(self) -> bool:
-        return bool(self.webhook_url)
+        return bool(self.webhook_url or (self.bot_token and self.channel))
 
     def post_incident_alert(self, incident: Incident, recommended_actions: list[str] | None = None) -> dict:
         if not self.configured:
@@ -52,6 +58,30 @@ class SlackService:
             oncall=oncall,
             footer="Medium confidence: SentinelAI is waiting for human confirmation.",
         )
+        return self._post(payload)
+
+    def post_thread_update(
+        self,
+        incident: Incident,
+        message: str,
+        thread_ts: str | None = None,
+        event_type: str | None = None,
+    ) -> dict:
+        if not self.configured:
+            return {"posted": False, "reason": "Slack is not configured"}
+        text = f"{incident.severity}: {incident.service} update - {message}"
+        payload = {
+            "channel": self.channel,
+            "text": text,
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": f"*{event_type or 'Update'}*\n{message}"},
+                }
+            ],
+        }
+        if thread_ts and self.bot_token:
+            payload["thread_ts"] = thread_ts
         return self._post(payload)
 
     def post_low_confidence_alert(self, incident: Incident, oncall: dict | None = None) -> dict:
@@ -119,9 +149,26 @@ class SlackService:
                     },
                 }
             )
+            blocks.append(
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "View Jira"},
+                            "url": incident.jira_ticket_url,
+                        },
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "Open dashboard"},
+                            "url": self.dashboard_url,
+                        },
+                    ],
+                }
+            )
 
         if oncall:
-            mention = oncall.get("slack_handle") or oncall.get("name") or "unassigned"
+            mention = self._mention(oncall)
             team = oncall.get("team") or "unknown team"
             blocks.append(
                 {
@@ -148,7 +195,15 @@ class SlackService:
 
     def _post(self, payload: dict) -> dict:
         try:
-            response = requests.post(self.webhook_url, json=payload, timeout=15)
+            if self.bot_token:
+                response = requests.post(
+                    "https://slack.com/api/chat.postMessage",
+                    headers={"Authorization": f"Bearer {self.bot_token}", "Content-Type": "application/json"},
+                    json=payload,
+                    timeout=15,
+                )
+            else:
+                response = requests.post(self.webhook_url, json=payload, timeout=15)
             response.raise_for_status()
         except requests.RequestException as exc:
             return {"posted": False, "failed": True, "reason": f"Slack post failed: {exc}"}
@@ -157,4 +212,12 @@ class SlackService:
         content_type = response.headers.get("content-type", "")
         if response.content and "application/json" in content_type:
             data = response.json()
+            if data.get("ok") is False:
+                return {"posted": False, "failed": True, "reason": f"Slack post failed: {data.get('error', 'unknown error')}"}
         return {"posted": True, "ts": data.get("ts"), "channel": self.channel, "payload": payload}
+
+    def _mention(self, oncall: dict) -> str:
+        handle = oncall.get("slack_handle") or oncall.get("name") or "unassigned"
+        if isinstance(handle, str) and handle and not handle.startswith("@") and not handle.startswith("<@"):
+            return f"@{handle}"
+        return handle

@@ -2,7 +2,8 @@ import time
 
 from sqlalchemy.orm import Session
 
-from app.models import Incident, MetricSnapshot
+from app.models import Config, Incident, MetricSnapshot
+from app.services.response_agent import ResponseAgent
 from app.services.timeline_service import TimelineService
 
 
@@ -30,6 +31,7 @@ class RollbackService:
             f"Rollback started for {incident.service}",
             {"target_version": "v2.4.0"},
         )
+        self._sync_update(incident, "rollback_started", f"Rollback started for {incident.service}")
 
         for index, line in enumerate(ROLLBACK_LOGS, start=1):
             if delay_seconds > 0:
@@ -61,6 +63,7 @@ class RollbackService:
             "rollback_completed",
             f"Rollback completed for {incident.service}",
         )
+        self._sync_update(incident, "rollback_completed", f"Rollback completed for {incident.service}")
         self.db.commit()
 
         return {
@@ -69,3 +72,9 @@ class RollbackService:
             "logs": logs,
             "metric": {"service": incident.service, "metric_type": "error_rate", "value": 0.2},
         }
+
+    def _sync_update(self, incident: Incident, event_type: str, description: str) -> None:
+        config = self.db.query(Config).order_by(Config.id.desc()).first()
+        if not config:
+            return
+        ResponseAgent(self.db, config).post_timeline_update(incident, event_type, description)

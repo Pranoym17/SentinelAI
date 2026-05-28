@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import IncidentCommandPanel from '../components/IncidentCommandPanel.jsx';
 import TimelineFeed from '../components/TimelineFeed.jsx';
 import PostMortemViewer from '../components/PostMortemViewer.jsx';
-import { EmptyState, Panel } from '../components/ui.jsx';
+import { Panel, SkeletonRows } from '../components/ui.jsx';
 
 export default function IncidentDetailPage() {
   const { id } = useParams();
@@ -35,11 +35,11 @@ export default function IncidentDetailPage() {
     <main className="page-shell">
       <div className="page-head">
         <div>
-          <h1>{incident ? `${incident.severity}: ${incident.service}` : 'Loading incident'}</h1>
+          <h1>{incident ? `${incident.severity}: ${incident.service}` : 'Incident detail'}</h1>
         </div>
       </div>
       {error && <div className="notice">{error}</div>}
-      {loading && <Panel><EmptyState title="Loading incident" copy="Fetching incident detail and timeline." /></Panel>}
+      {loading && <Panel><SkeletonRows rows={6} /></Panel>}
       <div className="grid-dashboard">
         <section className="stack">
           <IncidentCommandPanel incident={incident} onRefresh={load} onResolved={setPostMortem} />

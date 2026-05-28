@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 
 import { api } from '../api.js';
-import DemoControlBar from '../components/DemoControlBar.jsx';
 import DeployFeed from '../components/DeployFeed.jsx';
 import IncidentCommandPanel from '../components/IncidentCommandPanel.jsx';
 import IncidentHistory from '../components/IncidentHistory.jsx';
@@ -11,7 +10,7 @@ import MetricsPanel from '../components/MetricsPanel.jsx';
 import PostMortemViewer from '../components/PostMortemViewer.jsx';
 import RollbackTerminal from '../components/RollbackTerminal.jsx';
 import TimelineFeed from '../components/TimelineFeed.jsx';
-import { MetricCell, Panel, StatusBadge } from '../components/ui.jsx';
+import { MetricCell, Panel, SkeletonRows, StatusBadge } from '../components/ui.jsx';
 
 export default function Dashboard() {
   const [state, setState] = useState(null);
@@ -19,6 +18,7 @@ export default function Dashboard() {
   const [incidents, setIncidents] = useState({ active: [], resolved: [] });
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [postMortem, setPostMortem] = useState('');
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
@@ -40,6 +40,8 @@ export default function Dashboard() {
       }
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -102,30 +104,10 @@ export default function Dashboard() {
           </span>
         ))}
         <span className="label" style={{ alignSelf: 'center', marginLeft: 'auto' }}>
-          {countdown ? `Autonomous detection in ${countdown}s` : agentStep ? `Latest: ${agentStep.event_type.replaceAll('_', ' ')}` : 'Agent is watching'}
+          {countdown ? `Detection armed: ${countdown}s` : agentStep ? `Latest: ${agentStep.event_type.replaceAll('_', ' ')}` : 'Agent is watching'}
         </span>
         </div>
       </Panel>
-
-      <DemoControlBar
-        busy={busy}
-        countdown={countdown}
-        workerState={state?.worker}
-        onFullSeed={() => run(() => api.fullSeed())}
-        onReset={() => run(() => api.resetDemo(true))}
-        onTrigger={() => run(() => api.triggerDemo(30))}
-        onInject={() =>
-          run(() =>
-            api.injectSignal({
-              service: 'payments',
-              type: 'error_spike',
-              value: 18,
-              baseline: 0.2,
-              unit: 'percent',
-            }),
-          )
-        }
-      />
 
       <section className="stats-row">
         <MetricCell label="System health" value={incident ? '68' : '94'} status={incident ? 'warning' : 'healthy'} />
@@ -137,8 +119,8 @@ export default function Dashboard() {
 
       <div className="grid-dashboard">
         <aside className="stack">
-          <MetricsPanel metrics={state?.metrics || []} />
-          <DeployFeed deploys={state?.recent_deploys || []} />
+          {loading ? <Panel><SkeletonRows rows={3} /></Panel> : <MetricsPanel metrics={state?.metrics || []} />}
+          {loading ? <Panel><SkeletonRows rows={4} /></Panel> : <DeployFeed deploys={state?.recent_deploys || []} />}
           <IntegrationStatus integrations={state?.integrations || {}} />
         </aside>
         <section className="stack">

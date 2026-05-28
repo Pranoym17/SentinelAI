@@ -88,3 +88,74 @@ def test_jira_failure_returns_structured_reason(monkeypatch):
     assert result["created"] is False
     assert result["failed"] is True
     assert "No permission" in result["reason"]
+
+
+def test_jira_assigns_oncall_by_email(monkeypatch):
+    monkeypatch.setenv("JIRA_BASE_URL", "https://example.atlassian.net")
+    monkeypatch.setenv("JIRA_EMAIL", "user@example.com")
+    monkeypatch.setenv("JIRA_API_TOKEN", "token")
+    monkeypatch.setenv("JIRA_PROJECT_KEY", "INC")
+
+    search_response = Mock()
+    search_response.raise_for_status.return_value = None
+    search_response.json.return_value = [{"accountId": "abc-123", "emailAddress": "sarah@example.com"}]
+    assign_response = Mock()
+    assign_response.raise_for_status.return_value = None
+
+    with patch("app.services.jira_service.requests.get", return_value=search_response) as get:
+        with patch("app.services.jira_service.requests.put", return_value=assign_response) as put:
+            result = JiraService().assign_issue("INC-123", {"email": "sarah@example.com", "name": "Sarah"})
+
+    assert result["assigned"] is True
+    assert result["account_id"] == "abc-123"
+    assert get.call_args.kwargs["params"]["query"] == "sarah@example.com"
+    assert put.call_args.kwargs["json"] == {"accountId": "abc-123"}
+
+
+def test_jira_creates_subtasks_from_actions(monkeypatch):
+    monkeypatch.setenv("JIRA_BASE_URL", "https://example.atlassian.net")
+    monkeypatch.setenv("JIRA_EMAIL", "user@example.com")
+    monkeypatch.setenv("JIRA_API_TOKEN", "token")
+    monkeypatch.setenv("JIRA_PROJECT_KEY", "INC")
+
+    incident = make_incident()
+    incident.jira_ticket_id = "INC-123"
+
+    response = Mock()
+    response.raise_for_status.return_value = None
+    response.json.side_effect = [{"key": "INC-124"}, {"key": "INC-125"}]
+
+    with patch("app.services.jira_service.requests.post", return_value=response) as post:
+        result = JiraService().create_subtasks(incident, ["Rollback payments-api", "Verify checkout"])
+
+    assert result["created"] is True
+    assert [item["ticket_id"] for item in result["subtasks"]] == ["INC-124", "INC-125"]
+    payload = post.call_args_list[0].kwargs["json"]
+    assert payload["fields"]["parent"]["key"] == "INC-123"
+    assert payload["fields"]["issuetype"]["name"] == "Sub-task"
+
+
+def test_jira_add_comment_and_transition(monkeypatch):
+    monkeypatch.setenv("JIRA_BASE_URL", "https://example.atlassian.net")
+    monkeypatch.setenv("JIRA_EMAIL", "user@example.com")
+    monkeypatch.setenv("JIRA_API_TOKEN", "token")
+    monkeypatch.setenv("JIRA_PROJECT_KEY", "INC")
+
+    comment_response = Mock(content=b"{}")
+    comment_response.raise_for_status.return_value = None
+    comment_response.json.return_value = {"id": "1001"}
+    transitions_response = Mock()
+    transitions_response.raise_for_status.return_value = None
+    transitions_response.json.return_value = {"transitions": [{"id": "31", "name": "Done"}]}
+    transition_response = Mock()
+    transition_response.raise_for_status.return_value = None
+
+    with patch("app.services.jira_service.requests.post", side_effect=[comment_response, transition_response]) as post:
+        with patch("app.services.jira_service.requests.get", return_value=transitions_response):
+            service = JiraService()
+            comment = service.add_comment("INC-123", "Incident resolved")
+            transition = service.transition_issue("INC-123", ["done"])
+
+    assert comment == {"commented": True, "comment_id": "1001"}
+    assert transition == {"transitioned": True, "transition": "Done"}
+    assert post.call_args_list[1].kwargs["json"] == {"transition": {"id": "31"}}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Button, EmptyState, Panel, SectionHeader } from '../components/ui.jsx';
+import { Button, EmptyState, Panel, SectionHeader, SkeletonRows } from '../components/ui.jsx';
 
 export default function RunbooksPage() {
   const [runbooks, setRunbooks] = useState([]);
@@ -63,10 +63,10 @@ export default function RunbooksPage() {
       </div>
       {message && <div className="notice success">{message}</div>}
       {error && <div className="notice">{error}</div>}
-      {loading && <Panel><EmptyState title="Loading runbooks" copy="Pulling operational memory." /></Panel>}
+      {loading && <Panel><SkeletonRows rows={6} /></Panel>}
       <div className="card-grid three">
         {!loading && filtered.length === 0 && (
-          <Panel><EmptyState title="No runbooks found" copy="Create one or resolve an incident to generate one automatically." /></Panel>
+          <Panel><EmptyState title="≡ No runbooks yet" copy="Runbooks are generated automatically when incidents resolve. Your first runbook will appear here after your first incident." /></Panel>
         )}
         {filtered.map((runbook) => (
           <Panel key={runbook.id}>
@@ -76,7 +76,7 @@ export default function RunbooksPage() {
               {(runbook.steps || []).map((step) => <li key={step}>{step}</li>)}
             </ol>
             <div className="mini-stats">
-              <span>{runbook.times_used} used</span>
+              <span>{runbook.times_used} uses</span>
               <span>{runbook.success_rate}% success</span>
             </div>
           </Panel>

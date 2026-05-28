@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
-import { DataTable, EmptyState, Panel, StatusBadge, TableHeader, TableRow } from '../components/ui.jsx';
+import { Button, DataTable, EmptyState, Panel, SkeletonRows, StatusBadge, TableHeader, TableRow } from '../components/ui.jsx';
 
 export default function IncidentsPage() {
   const navigate = useNavigate();
@@ -23,6 +23,7 @@ export default function IncidentsPage() {
   const rows = [...(incidents.active || []), ...(incidents.resolved || [])].filter((incident) =>
     filter === 'all' ? true : incident.status === filter,
   );
+  const total = (incidents.active?.length || 0) + (incidents.resolved?.length || 0);
 
   return (
     <main className="page-shell">
@@ -39,20 +40,28 @@ export default function IncidentsPage() {
       {error && <div className="notice">{error}</div>}
       <Panel>
         {loading ? (
-          <EmptyState title="Loading incidents" copy="Fetching active and resolved incidents." />
+          <SkeletonRows rows={5} />
         ) : rows.length === 0 ? (
-          <EmptyState title="No incidents yet" copy="Trigger the demo from the dashboard to populate this table." />
+          total === 0 ? (
+            <EmptyState title="◎ No incidents recorded" copy="The agent is monitoring your services. Incidents will appear here automatically when anomalies are detected." />
+          ) : (
+            <EmptyState
+              title="◎ No incidents match your filters"
+              copy="Adjust the status filter to see more incidents."
+              action={<Button size="sm" variant="ghost" onClick={() => setFilter('all')}>Clear filters</Button>}
+            />
+          )
         ) : (
           <DataTable columns="86px 110px minmax(240px, 1fr) 86px 90px 140px">
             <TableHeader cells={['Severity', 'Service', 'Hypothesis', 'Status', 'Jira', 'Time']} />
             {rows.map((incident) => (
               <TableRow key={incident.id} onClick={() => navigate(`/incidents/${incident.id}`)}>
                 <span><StatusBadge status={incident.severity} /></span>
-                <span>{incident.service}</span>
-                <span>{incident.hypothesis}</span>
+                <span>{incident.service || '—'}</span>
+                <span className="truncate" title={incident.hypothesis || ''}>{truncate(incident.hypothesis)}</span>
                 <span>{incident.status}</span>
-                <span>{incident.jira_ticket_id || 'none'}</span>
-                <span>{new Date(incident.detected_at).toLocaleString()}</span>
+                <span>{incident.jira_ticket_id || '—'}</span>
+                <span>{formatTime(incident.detected_at)}</span>
               </TableRow>
             ))}
           </DataTable>
@@ -60,4 +69,17 @@ export default function IncidentsPage() {
       </Panel>
     </main>
   );
+}
+
+function truncate(value = '', limit = 60) {
+  return value.length > limit ? `${value.slice(0, limit - 1)}…` : value || '—';
+}
+
+function formatTime(value) {
+  if (!value) return '—';
+  const then = new Date(value).getTime();
+  const minutes = Math.round((Date.now() - then) / 60000);
+  if (Number.isFinite(minutes) && minutes < 60) return `${Math.max(0, minutes)} minutes ago`;
+  if (Number.isFinite(minutes) && minutes < 1440) return `${Math.round(minutes / 60)} hours ago`;
+  return new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }

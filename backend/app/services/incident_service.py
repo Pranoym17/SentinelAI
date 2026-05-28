@@ -6,6 +6,7 @@ from app.agents.incident_orchestrator import IncidentOrchestrator
 from app.agents.post_mortem_agent import PostMortemAgent
 from app.agents.status_agent import StatusAgent
 from app.services.memory_service import MemoryService
+from app.services.response_agent import ResponseAgent
 from app.services.serializers import serialize_incident
 from app.services.runbook_service import RunbookService
 from app.services.sla_service import SLAService
@@ -94,6 +95,9 @@ class IncidentService:
             f"Updated successful runbook: {runbook.title}",
             {"runbook_id": runbook.id, "steps_count": len(runbook.steps or [])},
         )
+        config = self.latest_config()
+        if config:
+            ResponseAgent(self.db, config).finalize_resolution(incident)
         self.db.commit()
         self.db.refresh(incident)
 

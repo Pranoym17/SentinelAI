@@ -65,3 +65,47 @@ def test_webhook_failure_returns_structured_failure(monkeypatch):
     assert result["posted"] is False
     assert result["failed"] is True
     assert "network down" in result["reason"]
+
+
+def test_slack_bot_token_posts_thread_update(monkeypatch):
+    monkeypatch.delenv("SLACK_WEBHOOK_URL", raising=False)
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-token")
+    monkeypatch.setenv("SLACK_CHANNEL", "C123")
+
+    response = Mock()
+    response.content = b'{"ok":true,"ts":"456.789"}'
+    response.headers = {"content-type": "application/json"}
+    response.raise_for_status.return_value = None
+    response.json.return_value = {"ok": True, "ts": "456.789"}
+
+    with patch("app.services.slack_service.requests.post", return_value=response) as post:
+        result = SlackService().post_thread_update(
+            make_incident(),
+            "Rollback started",
+            thread_ts="123.456",
+            event_type="rollback_started",
+        )
+
+    assert result["posted"] is True
+    assert result["ts"] == "456.789"
+    assert post.call_args.args[0] == "https://slack.com/api/chat.postMessage"
+    payload = post.call_args.kwargs["json"]
+    assert payload["thread_ts"] == "123.456"
+    assert payload["channel"] == "C123"
+
+
+def test_slack_payload_includes_link_buttons(monkeypatch):
+    monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.test/example")
+    response = Mock()
+    response.content = b""
+    response.headers = {}
+    response.raise_for_status.return_value = None
+
+    with patch("app.services.slack_service.requests.post", return_value=response) as post:
+        SlackService({"dashboard_url": "https://sentinel.example/dashboard"}).post_incident_alert(make_incident())
+
+    blocks = post.call_args.kwargs["json"]["blocks"]
+    actions = [block for block in blocks if block["type"] == "actions"]
+    assert actions
+    assert actions[0]["elements"][0]["url"] == "https://example.atlassian.net/browse/INC-123"
+    assert actions[0]["elements"][1]["url"] == "https://sentinel.example/dashboard"

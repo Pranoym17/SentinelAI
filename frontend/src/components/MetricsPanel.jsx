@@ -5,7 +5,7 @@ export default function MetricsPanel({ metrics }) {
     <Panel>
       <SectionHeader title="Watched services" meta={`${metrics.length} configured`} />
       {metrics.length === 0 ? (
-        <EmptyState title="No metrics" copy="Metrics appear after demo seed or worker updates." />
+        <EmptyState title="◎ Monitoring active — no metrics yet" copy="Service readings appear here after the worker records its first metric snapshot." />
       ) : (
         <div className="service-grid">
           {metrics.map((service) => {
@@ -22,11 +22,11 @@ export default function MetricsPanel({ metrics }) {
                 <dl>
                   <div>
                     <dt>Error rate</dt>
-                    <dd>{service.error_rate?.value ?? 0}%</dd>
+                    <dd>{Number(service.error_rate?.value ?? 0).toFixed(2)}%</dd>
                   </div>
                   <div>
                     <dt>Latency</dt>
-                    <dd>{service.latency_ms?.value ?? 0}ms</dd>
+                    <dd>{Math.round(service.latency_ms?.value ?? 0)}ms</dd>
                   </div>
                 </dl>
               </article>

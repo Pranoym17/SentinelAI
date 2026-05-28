@@ -17,10 +17,12 @@
   --healthy: #3fb950;
   --healthy-dim: rgba(63, 185, 80, 0.08);
   --accent: #388bfd;
+  --accent-bright: #58a6ff;
   --accent-dim: rgba(56, 139, 253, 0.08);
   --text-primary: #cdd9e5;
   --text-secondary: #768390;
   --text-muted: #444c56;
+  --text-on-accent: #ffffff;
   --terminal-green: #39d353;
   --font-display: 'IBM Plex Sans Condensed', sans-serif;
   --font-body: 'IBM Plex Sans', sans-serif;
@@ -136,7 +138,7 @@ h2 {
 
 ::-webkit-scrollbar-thumb {
   background: var(--border-bright);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
 }
 
 .app-shell {
@@ -319,7 +321,7 @@ h2 {
 .btn-primary {
   background: var(--accent);
   border: 1px solid var(--accent);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .btn-secondary {
@@ -346,7 +348,7 @@ h2 {
 }
 
 .btn-primary:hover {
-  background: #58a6ff;
+  background: var(--accent-bright);
 }
 
 .grid-dashboard {

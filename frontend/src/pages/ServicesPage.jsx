@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
-import { Button, EmptyState, Panel, SectionHeader, StatusBadge } from '../components/ui.jsx';
+import { Button, EmptyState, Panel, SectionHeader, SkeletonRows, StatusBadge } from '../components/ui.jsx';
 
 export default function ServicesPage() {
   const [services, setServices] = useState([]);
@@ -54,7 +54,7 @@ export default function ServicesPage() {
       </div>
       {message && <div className="notice success">{message}</div>}
       {error && <div className="notice">{error}</div>}
-      {loading && <Panel><EmptyState title="Loading services" copy="Fetching service catalog and SLA records." /></Panel>}
+      {loading && <Panel><SkeletonRows rows={5} /></Panel>}
       <div className="card-grid three">
         {!loading && services.length === 0 && (
           <Panel><EmptyState title="No services configured" copy="Add the first monitored service below." /></Panel>
@@ -67,11 +67,11 @@ export default function ServicesPage() {
                 <h2>{service.display_name || service.name}</h2>
                 <StatusBadge status={status?.status || 'healthy'} />
               </div>
-              <p className="muted">{service.description || 'No description yet.'}</p>
+              <p className="muted">{service.description || '—'}</p>
               <div className="mini-stats">
-                <span>{service.team || 'No team'}</span>
+                <span>{service.team || '—'}</span>
                 <span>{service.sla_target}% SLA</span>
-                <span>{status?.remaining_budget_minutes ?? 'n/a'}m budget</span>
+                <span>{status?.remaining_budget_minutes ?? '—'}m budget</span>
               </div>
             </Panel>
           );
